@@ -1,15 +1,23 @@
 import { randomUUID } from 'crypto';
 import { type Request, type Response } from 'express';
-import type { Event, UpdateEventPayload } from './events.type.js';
 import { AppError } from '../../shared/app-error.js';
+import type { IdParam } from '../../shared/types.js';
+import { createEventSchema, idParamSchema, updateEventSchema } from './events.schema.js';
+import type { Event } from './events.type.js';
 
 const events: Event[] = [];
 
-export async function getEvents(_: Request, res: Response) {
+export function getEvents(_: Request, res: Response) {
   return res.status(200).json({ data: events });
 }
 
-export async function getEvent(req: Request, res: Response) {
+export function getEvent(req: Request<IdParam>, res: Response) {
+  const result = idParamSchema.safeParse(req.params);
+
+  if (!result.success) {
+    throw AppError.badRequest('Event', 'Invalid id format');
+  }
+
   const { id } = req.params;
 
   const eventExists = events.find((event) => {
@@ -23,18 +31,13 @@ export async function getEvent(req: Request, res: Response) {
 }
 
 export function addEvent(req: Request, res: Response) {
-  const { title, description, category, durationMins, language } = req.body;
+  const result = createEventSchema.safeParse(req.body);
 
-  if (!title || !description || !category || !durationMins || !language) {
-    throw AppError.badRequest(
-      'Event',
-      `Missing required field(s). All "title", "description", "category", "durationMins" and "language" are mandatory fields`
-    );
+  if (!result.success) {
+    throw AppError.badRequest('Event', result.error.message);
   }
 
-  if (!(typeof durationMins === 'number' && durationMins > 0)) {
-    throw AppError.badRequest('Event', `durationMins should be a positive number`);
-  }
+  const { title, description, category, durationMins, language } = result.data;
 
   const existingEvent = events.find(
     (event) => event.title.toLowerCase() === title.toLocaleLowerCase()
@@ -57,17 +60,15 @@ export function addEvent(req: Request, res: Response) {
   return res.status(201).location(location).json({ data: event });
 }
 
-export function updateEvent(req: Request, res: Response) {
-  const { id } = req.params;
-  const updates = req.body;
+export function updateEvent(req: Request<IdParam>, res: Response) {
+  const result = updateEventSchema.safeParse(req.body);
 
-  const eventIndex = events.findIndex((event) => {
-    return event.id === id;
-  });
-
-  if (eventIndex === -1) {
-    throw AppError.notFound('Event', `Could not find any event with id: ${id}`);
+  if (!result.success) {
+    throw AppError.badRequest('Event', result.error.message);
   }
+
+  const { id } = req.params;
+  const updates = result.data;
 
   if ('id' in updates) {
     throw AppError.badRequest('Event', `id field is readonly and cannot be updated`);
@@ -83,13 +84,9 @@ export function updateEvent(req: Request, res: Response) {
     }
   }
 
-  const { durationMins } = updates;
-  if (durationMins !== undefined) {
-    if (!(typeof durationMins === 'number' && durationMins > 0)) {
-      throw AppError.badRequest('Event', `durationMins should be a positive number`);
-    }
-  }
-
+  const eventIndex = events.findIndex((event) => {
+    return event.id === id;
+  });
   const existingEvent = events[eventIndex];
   if (!existingEvent) {
     throw AppError.notFound('Event', `Could not find any event with id: ${id}`);
@@ -104,7 +101,7 @@ export function updateEvent(req: Request, res: Response) {
   return res.status(200).json({ data: updatedEvent });
 }
 
-export function deleteEvent(req: Request, res: Response) {
+export function deleteEvent(req: Request<IdParam>, res: Response) {
   const { id } = req.params;
 
   const eventIndex = events.findIndex((event) => {

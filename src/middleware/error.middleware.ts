@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { ZodError } from 'zod';
 import { AppError } from '../shared/app-error.js';
 import type { CommonErrorResponse } from '../shared/types.js';
 
@@ -16,7 +17,7 @@ export function globalErrorHandler(
     return next(err);
   }
 
-  const requestId: string = res.locals.requestId;
+  const requestId = typeof res.locals.requestId === 'string' ? res.locals.requestId : 'unknown';
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
@@ -35,6 +36,19 @@ export function globalErrorHandler(
     });
   }
 
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid request',
+        requestId,
+        details: err.issues.map((issue) => ({
+          field: issue.path.map(String).join('.'),
+          message: issue.message,
+        })),
+      },
+    });
+  }
   console.error(`[${requestId}] Unhandled error`, err);
   return res.status(500).json({
     error: {
