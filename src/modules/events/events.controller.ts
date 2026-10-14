@@ -2,12 +2,18 @@ import { randomUUID } from 'crypto';
 import { type Request, type Response } from 'express';
 import { AppError } from '../../shared/app-error.js';
 import type { IdParam } from '../../shared/types.js';
-import { createEventSchema, idParamSchema, updateEventSchema } from './events.schema.js';
+import {
+  createEventSchema,
+  idParamSchema,
+  listQuerySchema,
+  updateEventSchema,
+} from './events.schema.js';
 import type { Event } from './events.type.js';
 
 const events: Event[] = [];
 
-export function getEvents(_: Request, res: Response) {
+export function getEvents(req: Request, res: Response) {
+  listQuerySchema.parse(req.query);
   return res.status(200).json({ data: events });
 }
 
@@ -31,13 +37,9 @@ export function getEvent(req: Request<IdParam>, res: Response) {
 }
 
 export function addEvent(req: Request, res: Response) {
-  const result = createEventSchema.safeParse(req.body);
+  const input = createEventSchema.parse(req.body);
 
-  if (!result.success) {
-    throw AppError.badRequest('Event', result.error.message);
-  }
-
-  const { title, description, category, durationMins, language } = result.data;
+  const { title, description, category, durationMins, language } = input;
 
   const existingEvent = events.find(
     (event) => event.title.toLowerCase() === title.toLocaleLowerCase()

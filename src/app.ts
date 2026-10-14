@@ -9,7 +9,7 @@ app.use(addRequestId);
 app.use(express.json());
 app.use('/api/events', router);
 
-app.use((req, res) => {
+app.use((req, _res) => {
   throw AppError.notFound(
     'Route',
     `Cannot ${req.method} the requested endpoint ${req.originalUrl}`

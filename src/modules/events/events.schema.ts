@@ -12,8 +12,8 @@ export const createEventSchema = z.object({
 export const updateEventSchema = createEventSchema.partial().strict();
 
 export const listQuerySchema = z.object({
-  limit: z.coerce.number().max(100).default(20),
-  offset: z.coerce.number(),
+  limit: z.coerce.number().positive().max(100).default(20),
+  offset: z.coerce.number().default(0),
 });
 
 export const idParamSchema = z.object({
