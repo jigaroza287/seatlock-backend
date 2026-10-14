@@ -1,21 +1,17 @@
 import { z } from 'zod';
-import { CategorySchema } from './events.type.js';
+
+export const CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as const;
+export const CategorySchema = z.enum(CATEGORIES);
 
 export const createEventSchema = z.object({
   title: z.string().min(1).max(100),
   description: z.string().min(20).max(2000),
   category: CategorySchema,
-  durationMins: z.number().positive(),
+  durationMins: z.number().int().positive(),
   language: z.string().length(2),
 });
 
-export const updateEventSchema = createEventSchema.partial().strict();
-
-export const listQuerySchema = z.object({
-  limit: z.coerce.number().positive().max(100).default(20),
-  offset: z.coerce.number().default(0),
-});
-
-export const idParamSchema = z.object({
-  id: z.uuid(),
-});
+export const updateEventSchema = createEventSchema
+  .partial()
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, 'At least one field must be provided');

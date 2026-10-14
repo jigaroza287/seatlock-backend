@@ -1,5 +1,5 @@
 import type z from 'zod';
-import type { idParamSchema } from '../modules/events/events.schema.js';
+import type { idParamSchema, listQuerySchema } from './schema.js';
 
 export type CommonError = {
   code: string;
@@ -13,3 +13,5 @@ export type CommonErrorResponse = {
 };
 
 export type IdParam = z.infer<typeof idParamSchema>;
+
+export type PaginationInput = z.infer<typeof listQuerySchema>;

@@ -1,17 +1,17 @@
 import { z } from 'zod';
-import type { createEventSchema } from './events.schema.js';
+import type { PaginationInput } from '../../shared/types.js';
+import type { CategorySchema, createEventSchema, updateEventSchema } from './events.schema.js';
 
-export const CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as const;
-export const CategorySchema = z.enum(CATEGORIES);
 export type CategoryType = z.infer<typeof CategorySchema>;
 
-type CreateEventInput = z.infer<typeof createEventSchema>;
-type UpdateEventInput = Partial<Omit<Event, 'id'>>;
-
+export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type Event = CreateEventInput & { id: string };
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
+
+export type EventListOutput = { items: Event[]; total: number };
 
 export interface EventRepository {
-  findAll(): Event[];
+  findMany(paginationInput: PaginationInput): EventListOutput;
   findById(id: string): Event | undefined;
   findByTitle(title: string): Event | undefined;
   create(input: CreateEventInput): Event;
