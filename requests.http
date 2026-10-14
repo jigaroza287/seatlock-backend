@@ -1,0 +1,83 @@
+@baseUrl = http://localhost:8000/api
+
+### Create event (201)
+# @name createEvent
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{ "title": "Test Title", "description": "This is a short description", "category": "concert", "durationMins": 240, "language": "en" }
+
+### Get the event just created (200)
+GET {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+
+### Get all the events (200)
+GET {{baseUrl}}/events
+
+### Create another event (201)
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{ "title": "Test Title 1", "description": "This is a short description", "category": "concert", "durationMins": 240, "language": "en" }
+
+### Event title already exists while updating event title (409)
+PATCH {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "title": "Test Title 1" }
+
+### Invalid body (400)
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{ "title": 123 }
+
+### Unknown id (404)
+GET {{baseUrl}}/events/00000000-0000-0000-0000-000000000000
+
+### Delete event (204)
+DELETE {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+
+### Duplicate title on create (409), run after "Create event"
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{ "title": "Test Title", "description": "Another long enough description", "category": "comedy", "durationMins": 90, "language": "en" }
+
+### Update title (200)
+PATCH {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "title": "Renamed Title" }
+
+### Verify the update was saved (200, title must be "Renamed Title")
+GET {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+
+### Empty PATCH (400)
+PATCH {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+Content-Type: application/json
+
+{}
+
+### Read-only id in PATCH (400, strict schema)
+PATCH {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "id": "abc" }
+
+### Bad UUID (400)
+GET {{baseUrl}}/events/not-a-uuid
+
+### Malformed JSON (400)
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{ "title": 
+
+### Bad pagination (400)
+GET {{baseUrl}}/events?limit=abc
+
+### Pagination works (200, check the pagination object)
+GET {{baseUrl}}/events?limit=1&offset=0
+
+### Verify the delete worked (404), run after "Delete event"
+GET {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
