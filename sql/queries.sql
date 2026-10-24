@@ -122,3 +122,95 @@ LIMIT
   5;
 
 -- Result of Query 10: 5 rows ids ending 402, 401, 404, 403, 406. Top is 5397000 paise.
+-- Query 11: Shows priced above the average show price
+SELECT
+  *
+FROM
+  shows
+WHERE
+  price_minor > (
+    SELECT
+      avg(price_minor)
+    FROM
+      shows
+  );
+
+-- Result of Query 11: 2 rows ids ending 401, 402. Avg returns scalar value, so it works perfectly with subquery in where condition.
+-- Query 12: Events that have no shows
+SELECT
+  *
+FROM
+  events e
+WHERE
+  NOT EXISTS (
+    SELECT
+      1
+    FROM
+      shows s
+    WHERE
+      s.event_id = e.id
+  );
+
+-- Result of Query 12: 1 row Paper boats.
+-- Query 13: Seat count per screen per category, with categories in display order (sort_order)
+SELECT
+  s.name,
+  se.category,
+  count(se.id) AS seat_count
+FROM
+  seats se
+  JOIN screens s ON s.id = se.screen_id
+  JOIN seat_categories sc ON sc.code = se.category
+GROUP BY
+  s.id,
+  s.name,
+  se.category,
+  sc.sort_order
+ORDER BY
+  s.name,
+  sc.sort_order;
+
+-- Result of Query 13: 7 rows order by sort_order in seat_categories.
+-- Query 14: For every venue: number of screens and total seat capacity
+SELECT
+  v.city,
+  v.name,
+  count(DISTINCT sc.id) AS total_screens,
+  count(se.id) AS total_seats
+FROM
+  venues v
+  LEFT JOIN screens sc ON sc.venue_id = v.id
+  LEFT JOIN seats se ON se.screen_id = sc.id
+GROUP BY
+  v.id,
+  v.city,
+  v.name;
+
+-- Result of Query 14: 3 rows, distinct count is the key.
+-- Query 15: API query: shows for The Last Monsoon in Ahmedabad on 7 Nov (IST), with venue, screen, start time and price, earliest first
+SELECT
+  e.title,
+  v.city,
+  v.name,
+  s.name,
+  sw.starts_at,
+  sw.price_minor
+FROM
+  shows sw
+  JOIN events e ON e.id = sw.event_id
+  JOIN screens s ON s.id = sw.screen_id
+  JOIN venues v ON v.id = s.venue_id
+WHERE
+  v.city = 'Ahmedabad'
+  AND sw.starts_at >= (
+    '2026-11-07'::date::timestamp AT time zone 'Asia/Kolkata'
+  )
+  AND sw.starts_at < (
+    '2026-11-07'::date::timestamp AT time zone 'Asia/Kolkata'
+  ) + interval '1 day'
+  AND sw.event_id = '01900000-0000-7000-8000-000000000303'
+ORDER BY
+  sw.starts_at,
+  s.name;
+
+-- Result of Query 15: 3 rows
