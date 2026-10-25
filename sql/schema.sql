@@ -12,7 +12,7 @@ CREATE TABLE venues (
   city text NOT NULL,
   address text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT venues_name_length_check CHECK (char_length(name) BETWEEN 1 AND 100),
+  CONSTRAINT venues_name_length_check CHECK (char_length(trim(name)) BETWEEN 1 AND 100),
   CONSTRAINT venues_name_city_key UNIQUE (name, city)
 );
 
@@ -48,7 +48,7 @@ CREATE TABLE seats (
   category text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT seats_screen_id_fkey FOREIGN key (screen_id) REFERENCES screens (id) ON DELETE CASCADE,
-  CONSTRAINT seats_row_label_not_empty_check CHECK (char_length(row_label) > 0),
+  CONSTRAINT seats_row_label_not_empty_check CHECK (char_length(trim(row_label)) > 0),
   CONSTRAINT seats_seat_number_positive_check CHECK (seat_number > 0),
   CONSTRAINT seats_category_fkey FOREIGN key (category) REFERENCES seat_categories (code) ON DELETE RESTRICT,
   CONSTRAINT seats_screen_id_row_label_seat_number_key UNIQUE (screen_id, row_label, seat_number)
@@ -74,11 +74,13 @@ CREATE TABLE events (
   language text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT events_title_key UNIQUE (title),
-  CONSTRAINT events_title_length_check CHECK (char_length(title) BETWEEN 1 AND 100),
-  CONSTRAINT events_description_length_check CHECK (char_length(description) BETWEEN 20 AND 2000),
+  CONSTRAINT events_title_length_check CHECK (char_length(trim(title)) BETWEEN 1 AND 100),
+  CONSTRAINT events_description_length_check CHECK (
+    char_length(trim(description)) BETWEEN 20 AND 2000
+  ),
   CONSTRAINT events_category_fkey FOREIGN key (category) REFERENCES event_categories (code) ON DELETE RESTRICT,
   CONSTRAINT events_duration_mins_positive_check CHECK (duration_mins > 0),
-  CONSTRAINT events_language_length_check CHECK (char_length(language) = 2)
+  CONSTRAINT events_language_length_check CHECK (char_length(trim(language)) = 2)
 );
 
 CREATE TABLE shows (
