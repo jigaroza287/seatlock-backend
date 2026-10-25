@@ -13,6 +13,7 @@ CREATE TABLE venues (
   address text,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT venues_name_length_check CHECK (char_length(trim(name)) BETWEEN 1 AND 100),
+  CONSTRAINT venues_city_length_check CHECK (char_length(trim(city)) BETWEEN 1 AND 100),
   CONSTRAINT venues_name_city_key UNIQUE (name, city)
 );
 
@@ -22,6 +23,7 @@ CREATE TABLE screens (
   venue_id uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT screens_venue_id_fkey FOREIGN key (venue_id) REFERENCES venues (id) ON DELETE RESTRICT,
+  CONSTRAINT screens_name_length_check CHECK (char_length(trim(name)) BETWEEN 1 AND 100),
   CONSTRAINT screens_venue_id_name_key UNIQUE (venue_id, name)
 );
 

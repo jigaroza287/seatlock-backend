@@ -4,8 +4,8 @@ export const CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as
 export const CategorySchema = z.enum(CATEGORIES);
 
 export const createEventSchema = z.object({
-  title: z.string().min(1).max(100),
-  description: z.string().min(20).max(2000),
+  title: z.string().trim().min(1).max(100),
+  description: z.string().trim().min(20).max(2000),
   category: CategorySchema,
   durationMins: z.number().int().positive(),
   language: z.string().length(2),
