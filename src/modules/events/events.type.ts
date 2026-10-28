@@ -11,10 +11,9 @@ export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type EventListOutput = { items: Event[]; total: number };
 
 export interface EventRepository {
-  findMany(paginationInput: PaginationInput): EventListOutput;
-  findById(id: string): Event | undefined;
-  findByTitle(title: string): Event | undefined;
-  create(input: CreateEventInput): Event;
-  update(id: string, changes: UpdateEventInput): Event | undefined;
-  delete(id: string): boolean;
+  findMany(paginationInput: PaginationInput): Promise<EventListOutput>;
+  findById(id: string): Promise<Event | null>;
+  create(input: CreateEventInput): Promise<Event>;
+  update(id: string, changes: UpdateEventInput): Promise<Event | null>;
+  delete(id: string): Promise<boolean>;
 }

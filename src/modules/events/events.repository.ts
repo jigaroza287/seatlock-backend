@@ -7,66 +7,78 @@ import type {
   EventRepository,
   UpdateEventInput,
 } from './events.type.js';
+import { AppError } from '../../shared/app-error.js';
 
 class InMemoryEventRepository implements EventRepository {
   #events = new Map<string, Event>();
+  #isTitleTaken(title: string, excludeId?: string): boolean {
+    for (const event of this.#events.values()) {
+      if (event.id !== excludeId && event.title.toLowerCase() === title.toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
-  findMany(paginationInput: PaginationInput): EventListOutput {
+  findMany(paginationInput: PaginationInput): Promise<EventListOutput> {
     const allEvents = [...this.#events.values()];
-    return {
+    return Promise.resolve({
       items: allEvents.slice(
         paginationInput.offset,
         paginationInput.offset + paginationInput.limit
       ),
       total: allEvents.length,
-    };
+    });
   }
 
-  findById(id: string): Event | undefined {
-    return this.#events.get(id);
+  findById(id: string): Promise<Event | null> {
+    return Promise.resolve(this.#events.get(id) ?? null);
   }
 
-  findByTitle(title: string): Event | undefined {
-    for (const event of this.#events.values()) {
-      if (event.title.toLocaleLowerCase() === title.toLocaleLowerCase()) {
-        return event;
-      }
+  create(input: CreateEventInput): Promise<Event> {
+    if (this.#isTitleTaken(input.title)) {
+      return Promise.reject(
+        AppError.conflict('Event', `Title '${input.title}' is already used by another event`)
+      );
     }
 
-    return undefined;
-  }
-
-  create(input: CreateEventInput): Event {
     const id = randomUUID();
     const event: Event = {
       id,
       ...input,
     };
     this.#events.set(id, event);
-    return event;
+    return Promise.resolve(event);
   }
 
-  update(id: string, changes: UpdateEventInput): Event | undefined {
+  update(id: string, changes: UpdateEventInput): Promise<Event | null> {
     const existingEvent = this.#events.get(id);
     if (existingEvent !== undefined) {
+      if (changes.title) {
+        if (this.#isTitleTaken(changes.title, id)) {
+          return Promise.reject(
+            AppError.conflict('Event', `Title '${changes.title}' is already used by another event`)
+          );
+        }
+      }
       const updatedEvent = {
         ...existingEvent,
         ...changes,
       };
       this.#events.set(id, updatedEvent);
-      return updatedEvent;
+      return Promise.resolve(updatedEvent);
     }
 
-    return undefined;
+    return Promise.resolve(null);
   }
 
-  delete(id: string): boolean {
+  delete(id: string): Promise<boolean> {
     if (this.#events.has(id)) {
       this.#events.delete(id);
-      return true;
+      return Promise.resolve(true);
     }
 
-    return false;
+    return Promise.resolve(false);
   }
 }
 
