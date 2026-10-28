@@ -75,7 +75,6 @@ CREATE TABLE events (
   duration_mins integer NOT NULL,
   language text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT events_title_key UNIQUE (title),
   CONSTRAINT events_title_length_check CHECK (char_length(trim(title)) BETWEEN 1 AND 100),
   CONSTRAINT events_description_length_check CHECK (
     char_length(trim(description)) BETWEEN 20 AND 2000
@@ -84,6 +83,8 @@ CREATE TABLE events (
   CONSTRAINT events_duration_mins_positive_check CHECK (duration_mins > 0),
   CONSTRAINT events_language_length_check CHECK (char_length(trim(language)) = 2)
 );
+
+CREATE UNIQUE INDEX events_title_lower_key ON events (lower(title));
 
 CREATE TABLE shows (
   id uuid PRIMARY KEY DEFAULT uuidv7(),
