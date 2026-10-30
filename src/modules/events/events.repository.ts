@@ -4,12 +4,12 @@ import type {
   CreateEventInput,
   Event,
   EventListOutput,
-  EventRepository,
+  IEventRepository,
   UpdateEventInput,
 } from './events.type.js';
 import { AppError } from '../../shared/app-error.js';
 
-class InMemoryEventRepository implements EventRepository {
+class InMemoryEventRepository implements IEventRepository {
   #events = new Map<string, Event>();
   #isTitleTaken(title: string, excludeId?: string): boolean {
     for (const event of this.#events.values()) {
@@ -82,4 +82,4 @@ class InMemoryEventRepository implements EventRepository {
   }
 }
 
-export const eventRepository: EventRepository = new InMemoryEventRepository();
+export const eventRepository: IEventRepository = new InMemoryEventRepository();

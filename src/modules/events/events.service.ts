@@ -5,7 +5,7 @@ import type {
   CreateEventInput,
   Event,
   EventListOutput,
-  EventRepository,
+  IEventRepository,
   UpdateEventInput,
 } from './events.type.js';
 
@@ -14,7 +14,7 @@ function notFound(id: string): AppError {
 }
 
 class EventService {
-  constructor(private readonly repository: EventRepository) {}
+  constructor(private readonly repository: IEventRepository) {}
 
   list(paginationInput: PaginationInput): Promise<EventListOutput> {
     return this.repository.findMany(paginationInput);

@@ -10,7 +10,7 @@ export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 
 export type EventListOutput = { items: Event[]; total: number };
 
-export interface EventRepository {
+export interface IEventRepository {
   findMany(paginationInput: PaginationInput): Promise<EventListOutput>;
   findById(id: string): Promise<Event | null>;
   create(input: CreateEventInput): Promise<Event>;
