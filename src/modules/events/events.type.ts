@@ -1,6 +1,10 @@
 import { z } from 'zod';
-import type { PaginationInput } from '../../shared/types.js';
-import type { CategorySchema, createEventSchema, updateEventSchema } from './events.schema.js';
+import type {
+  CategorySchema,
+  createEventSchema,
+  listEventQuerySchema,
+  updateEventSchema,
+} from './events.schema.js';
 
 export type CategoryType = z.infer<typeof CategorySchema>;
 
@@ -11,9 +15,11 @@ export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type EventListOutput = { items: Event[]; total: number };
 
 export interface IEventRepository {
-  findMany(paginationInput: PaginationInput): Promise<EventListOutput>;
+  findMany(query: ListEventsQuery): Promise<EventListOutput>;
   findById(id: string): Promise<Event | null>;
   create(input: CreateEventInput): Promise<Event>;
   update(id: string, changes: UpdateEventInput): Promise<Event | null>;
   delete(id: string): Promise<boolean>;
 }
+
+export type ListEventsQuery = z.infer<typeof listEventQuerySchema>;

@@ -1,11 +1,11 @@
 import { AppError } from '../../shared/app-error.js';
-import type { PaginationInput } from '../../shared/types.js';
 import { eventRepository } from './events.repository.js';
 import type {
   CreateEventInput,
   Event,
   EventListOutput,
   IEventRepository,
+  ListEventsQuery,
   UpdateEventInput,
 } from './events.type.js';
 
@@ -16,8 +16,8 @@ function notFound(id: string): AppError {
 class EventService {
   constructor(private readonly repository: IEventRepository) {}
 
-  list(paginationInput: PaginationInput): Promise<EventListOutput> {
-    return this.repository.findMany(paginationInput);
+  list(listEventsQuery: ListEventsQuery): Promise<EventListOutput> {
+    return this.repository.findMany(listEventsQuery);
   }
 
   async getById(id: string): Promise<Event> {

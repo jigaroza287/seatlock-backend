@@ -1,15 +1,29 @@
 import { randomUUID } from 'crypto';
-import type { PaginationInput } from '../../shared/types.js';
+import { prisma } from '../../db/prisma.js';
+import type { Event as EventRow } from '../../generated/prisma/client.js';
+import { AppError } from '../../shared/app-error.js';
+import { CategorySchema } from './events.schema.js';
 import type {
   CreateEventInput,
   Event,
   EventListOutput,
   IEventRepository,
+  ListEventsQuery,
   UpdateEventInput,
 } from './events.type.js';
-import { AppError } from '../../shared/app-error.js';
 
-class InMemoryEventRepository implements IEventRepository {
+function toEvent(row: EventRow): Event {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    category: CategorySchema.parse(row.category),
+    durationMins: row.durationMins,
+    language: row.language,
+  };
+}
+
+class EventRepository implements IEventRepository {
   #events = new Map<string, Event>();
   #isTitleTaken(title: string, excludeId?: string): boolean {
     for (const event of this.#events.values()) {
@@ -20,19 +34,31 @@ class InMemoryEventRepository implements IEventRepository {
     return false;
   }
 
-  findMany(paginationInput: PaginationInput): Promise<EventListOutput> {
-    const allEvents = [...this.#events.values()];
-    return Promise.resolve({
-      items: allEvents.slice(
-        paginationInput.offset,
-        paginationInput.offset + paginationInput.limit
-      ),
-      total: allEvents.length,
-    });
+  async findMany(query: ListEventsQuery): Promise<EventListOutput> {
+    const where = {
+      title: query.search ? { contains: query.search, mode: 'insensitive' as const } : undefined,
+      category: query.category,
+    };
+
+    const [rows, total] = await prisma.$transaction([
+      prisma.event.findMany({
+        where,
+        orderBy: { title: 'asc' },
+        skip: query.offset,
+        take: query.limit,
+      }),
+      prisma.event.count({ where }),
+    ]);
+
+    return { items: rows.map(toEvent), total };
   }
 
-  findById(id: string): Promise<Event | null> {
-    return Promise.resolve(this.#events.get(id) ?? null);
+  async findById(id: string): Promise<Event | null> {
+    const row = await prisma.event.findUnique({ where: { id } });
+    if (!row) {
+      return null;
+    }
+    return toEvent(row);
   }
 
   create(input: CreateEventInput): Promise<Event> {
@@ -82,4 +108,4 @@ class InMemoryEventRepository implements IEventRepository {
   }
 }
 
-export const eventRepository: IEventRepository = new InMemoryEventRepository();
+export const eventRepository: IEventRepository = new EventRepository();
