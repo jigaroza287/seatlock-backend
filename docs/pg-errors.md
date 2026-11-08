@@ -41,7 +41,7 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | `venues_name_city_key`                      | Same venue name in the same city         | `VENUE_CONFLICT`  | A venue with this name already exists in this city   |
 | `screens_venue_id_name_key`                 | Same screen name at the same venue       | `SCREEN_CONFLICT` | A screen with this name already exists at this venue |
 | `seats_screen_id_row_label_seat_number_key` | Same row and number on the same screen   | `SEAT_CONFLICT`   | This seat already exists on this screen              |
-| `events_title_key`                          | Duplicate event title                    | `EVENT_CONFLICT`  | An event with this title already exists              |
+| `events_title_lower_key`                    | Duplicate event title                    | `EVENT_CONFLICT`  | An event with this title already exists              |
 | `shows_screen_id_starts_at_key`             | Two shows on one screen at the same time | `SHOW_CONFLICT`   | This screen already has a show at this time          |
 | `seat_categories_sort_order_key`            | Reference data only                      | n/a               | 500                                                  |
 
@@ -74,6 +74,8 @@ Put the field in `details`, e.g. `{ venueId: ["Venue does not exist"] }`, so it 
 | Constraint                                      | Rule                                 | Field          |
 | ----------------------------------------------- | ------------------------------------ | -------------- |
 | `venues_name_length_check`                      | Trimmed name 1 to 100 chars          | `name`         |
+| `venues_city_length_check`                      | Trimmed city 1 to 100 chars          | `city`         |
+| `screens_name_length_check`                     | Trimmed name 1 to 100 chars          | `name`         |
 | `seats_row_label_not_empty_check`               | Trimmed row label not empty          | `rowLabel`     |
 | `seats_seat_number_positive_check`              | `seat_number > 0`                    | `seatNumber`   |
 | `events_title_length_check`                     | Trimmed title 1 to 100 chars         | `title`        |

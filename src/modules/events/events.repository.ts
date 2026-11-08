@@ -1,7 +1,6 @@
-import { randomUUID } from 'crypto';
 import { prisma } from '../../db/prisma.js';
-import type { Event as EventRow } from '../../generated/prisma/client.js';
-import { AppError } from '../../shared/app-error.js';
+import { Prisma, type Event as EventRow } from '../../generated/prisma/client.js';
+import { toAppError } from '../../shared/prisma-error.js';
 import { CategorySchema } from './events.schema.js';
 import type {
   CreateEventInput,
@@ -23,17 +22,12 @@ function toEvent(row: EventRow): Event {
   };
 }
 
-class EventRepository implements IEventRepository {
-  #events = new Map<string, Event>();
-  #isTitleTaken(title: string, excludeId?: string): boolean {
-    for (const event of this.#events.values()) {
-      if (event.id !== excludeId && event.title.toLowerCase() === title.toLowerCase()) {
-        return true;
-      }
-    }
-    return false;
-  }
+// P2025: update or delete found no row with this id.
+function isRecordNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+}
 
+class EventRepository implements IEventRepository {
   async findMany(query: ListEventsQuery): Promise<EventListOutput> {
     const where = {
       title: query.search ? { contains: query.search, mode: 'insensitive' as const } : undefined,
@@ -61,50 +55,46 @@ class EventRepository implements IEventRepository {
     return toEvent(row);
   }
 
-  create(input: CreateEventInput): Promise<Event> {
-    if (this.#isTitleTaken(input.title)) {
-      return Promise.reject(
-        AppError.conflict('Event', `Title '${input.title}' is already used by another event`)
-      );
+  async create(input: CreateEventInput): Promise<Event> {
+    const { title, description, category, durationMins, language } = input;
+    try {
+      const newEvent = await prisma.event.create({
+        data: {
+          title,
+          description,
+          category,
+          durationMins,
+          language,
+        },
+      });
+      return toEvent(newEvent);
+    } catch (error: unknown) {
+      throw toAppError(error, 'Event', 'create');
     }
-
-    const id = randomUUID();
-    const event: Event = {
-      id,
-      ...input,
-    };
-    this.#events.set(id, event);
-    return Promise.resolve(event);
   }
 
-  update(id: string, changes: UpdateEventInput): Promise<Event | null> {
-    const existingEvent = this.#events.get(id);
-    if (existingEvent !== undefined) {
-      if (changes.title) {
-        if (this.#isTitleTaken(changes.title, id)) {
-          return Promise.reject(
-            AppError.conflict('Event', `Title '${changes.title}' is already used by another event`)
-          );
-        }
+  async update(id: string, changes: UpdateEventInput): Promise<Event | null> {
+    try {
+      const updatedEvent = await prisma.event.update({ where: { id }, data: changes });
+      return toEvent(updatedEvent);
+    } catch (error: unknown) {
+      if (isRecordNotFound(error)) {
+        return null;
       }
-      const updatedEvent = {
-        ...existingEvent,
-        ...changes,
-      };
-      this.#events.set(id, updatedEvent);
-      return Promise.resolve(updatedEvent);
+      throw toAppError(error, 'Event', 'update');
     }
-
-    return Promise.resolve(null);
   }
 
-  delete(id: string): Promise<boolean> {
-    if (this.#events.has(id)) {
-      this.#events.delete(id);
-      return Promise.resolve(true);
+  async delete(id: string): Promise<boolean> {
+    try {
+      await prisma.event.delete({ where: { id } });
+      return true;
+    } catch (error: unknown) {
+      if (isRecordNotFound(error)) {
+        return false;
+      }
+      throw toAppError(error, 'Event', 'delete');
     }
-
-    return Promise.resolve(false);
   }
 }
 
