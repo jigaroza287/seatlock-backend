@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm format:check *)",
+      "Bash(pnpm test *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "ask": [
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm update *)",
+      "Bash(pnpm prisma *)",
+      "Bash(pnpm exec prisma *)",
+      "Bash(npx prisma *)",
+      "Bash(docker *)",
+      "Edit(./prisma/migrations/**)",
+      "Edit(./package.json)",
+      "Edit(./docker-compose.yml)"
+    ],
+    "deny": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(pnpm prisma migrate reset *)",
+      "Bash(pnpm exec prisma migrate reset *)",
+      "Bash(npx prisma migrate reset *)",
+      "Bash(docker compose down -v *)",
+      "Bash(docker compose down --volumes *)",
+      "Bash(docker volume rm *)",
+      "Bash(docker volume prune *)",
+      "Bash(docker system prune *)",
+      "Read(./.env)",
+      "Edit(./.env)",
+      "Edit(./src/generated/**)"
+    ]
+  }
+}
