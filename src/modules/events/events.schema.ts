@@ -9,7 +9,10 @@ export const createEventSchema = z.object({
   description: z.string().trim().min(20).max(2000),
   category: CategorySchema,
   durationMins: z.number().int().positive(),
-  language: z.string().length(2),
+  language: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2}$/),
 });
 
 export const updateEventSchema = createEventSchema
