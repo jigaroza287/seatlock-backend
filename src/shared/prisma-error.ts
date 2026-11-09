@@ -106,18 +106,18 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
   switch (err.code) {
     // 23505 unique_violation
     case 'P2002': {
-      const message = UNIQUE_MESSAGES[constraint];
-      return message ? AppError.conflict(entity, message) : err;
+      const message = UNIQUE_MESSAGES[constraint] ?? `${entity} already exists`;
+      return AppError.conflict(entity, message);
     }
 
     // Prisma uses P2003 for both 23503 and 23001, so the operation decides.
     case 'P2003': {
       if (operation === 'delete') {
-        const message = RESTRICT_MESSAGES[constraint];
-        return message ? AppError.conflict(entity, message) : err;
+        const message = RESTRICT_MESSAGES[constraint] ?? `${entity} is still referenced`;
+        return AppError.conflict(entity, message);
       }
       const fieldError = FOREIGN_KEY_FIELDS[constraint];
-      return fieldError ? validationError([fieldError]) : err;
+      return fieldError ? validationError([fieldError]) : validationError();
     }
 
     // 23502 not_null_violation, 22P02 invalid_text_representation
@@ -129,14 +129,14 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
 
     // Postgres errors without a Prisma code, e.g. 23514 check_violation
     case 'P2039': {
+      warnZodGap(entity, info);
       if (info.sqlState !== '23514') {
-        return err;
+        return validationError();
       }
       const fieldError = CHECK_FIELDS[constraint];
       if (!fieldError) {
-        return err;
+        return validationError();
       }
-      warnZodGap(entity, info);
       return validationError([fieldError]);
     }
 
