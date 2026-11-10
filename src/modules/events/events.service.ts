@@ -13,7 +13,7 @@ function notFound(id: string): AppError {
   return AppError.notFound('Event', `Could not find any event with id: ${id}`);
 }
 
-class EventService {
+export class EventService {
   constructor(private readonly repository: IEventRepository) {}
 
   list(listEventsQuery: ListEventsQuery): Promise<EventListOutput> {
