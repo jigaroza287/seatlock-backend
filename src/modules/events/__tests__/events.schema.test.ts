@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createEventSchema, listEventQuerySchema, updateEventSchema } from '../events.schema.js';
-
-const validEvent = {
-  title: 'A test title',
-  description: 'A very short event description',
-  category: 'comedy',
-  durationMins: 90,
-  language: 'en',
-};
+import type { CreateEventInput } from '../events.type.js';
+import { eventInput } from './events.fixtures.js';
 
 describe('createEventSchema', () => {
   it('accepts a valid event', () => {
-    expect(createEventSchema.safeParse(validEvent).success).toBe(true);
+    expect(createEventSchema.safeParse(eventInput).success).toBe(true);
   });
 
   it.each([
@@ -19,7 +13,7 @@ describe('createEventSchema', () => {
     { reason: 'blank', title: '' },
     { reason: 'more than 100 characters long', title: 'a'.repeat(101) },
   ])('rejects a title that is $reason', ({ title }) => {
-    const result = createEventSchema.safeParse({ ...validEvent, title });
+    const result = createEventSchema.safeParse({ ...eventInput, title });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['title']);
@@ -27,7 +21,7 @@ describe('createEventSchema', () => {
 
   it.each([1, 100])('accepts a title of %i characters', (length) => {
     const result = createEventSchema.safeParse({
-      ...validEvent,
+      ...eventInput,
       title: 'a'.repeat(length),
     });
 
@@ -40,7 +34,7 @@ describe('createEventSchema', () => {
     { reason: 'fewer than 20 characters', description: 'a'.repeat(19) },
     { reason: 'more than 2000 characters', description: 'a'.repeat(2001) },
   ])('rejects a description that is $reason', ({ description }) => {
-    const result = createEventSchema.safeParse({ ...validEvent, description });
+    const result = createEventSchema.safeParse({ ...eventInput, description });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['description']);
@@ -48,7 +42,7 @@ describe('createEventSchema', () => {
 
   it.each([20, 2000])('accepts a description of %i characters', (length) => {
     const result = createEventSchema.safeParse({
-      ...validEvent,
+      ...eventInput,
       description: 'a'.repeat(length),
     });
 
@@ -56,14 +50,14 @@ describe('createEventSchema', () => {
   });
 
   it('rejects an unsupported category', () => {
-    const result = createEventSchema.safeParse({ ...validEvent, category: 'music' });
+    const result = createEventSchema.safeParse({ ...eventInput, category: 'music' });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['category']);
   });
 
   it('rejects a non-string category', () => {
-    const result = createEventSchema.safeParse({ ...validEvent, category: 1 });
+    const result = createEventSchema.safeParse({ ...eventInput, category: 1 });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['category']);
@@ -75,7 +69,7 @@ describe('createEventSchema', () => {
     { reason: 'fractional', durationMins: 1.5 },
     { reason: 'not a number', durationMins: '90' },
   ])('rejects a duration that is $reason', ({ durationMins }) => {
-    const result = createEventSchema.safeParse({ ...validEvent, durationMins });
+    const result = createEventSchema.safeParse({ ...eventInput, durationMins });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['durationMins']);
@@ -88,7 +82,7 @@ describe('createEventSchema', () => {
     { reason: 'not two lowercase letters', language: 'e1' },
     { reason: 'not a string', language: 1 },
   ])('rejects a language that is $reason', ({ language }) => {
-    const result = createEventSchema.safeParse({ ...validEvent, language });
+    const result = createEventSchema.safeParse({ ...eventInput, language });
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['language']);
@@ -96,25 +90,25 @@ describe('createEventSchema', () => {
 
   it('trims title, description, and language in the parsed event', () => {
     const result = createEventSchema.safeParse({
-      ...validEvent,
-      title: '  A test title  ',
-      description: '  A very short event description  ',
-      language: ' en ',
+      ...eventInput,
+      title: `  ${eventInput.title}  `,
+      description: `  ${eventInput.description}  `,
+      language: ` ${eventInput.language} `,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data).toEqual(validEvent);
+      expect(result.data).toEqual(eventInput);
     }
   });
 
   it.each(['title', 'description', 'category', 'durationMins', 'language'] as const)(
     'rejects a missing %s',
     (field) => {
-      const event = { ...validEvent };
-      delete event[field];
+      const body: Partial<CreateEventInput> = { ...eventInput };
+      delete body[field];
 
-      const result = createEventSchema.safeParse(event);
+      const result = createEventSchema.safeParse(body);
 
       expect(result.success).toBe(false);
       expect(result.error?.issues.map((issue) => issue.path)).toContainEqual([field]);

@@ -1,20 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../shared/app-error.js';
 import { EventService } from '../events.service.js';
-import type { CreateEventInput, Event, IEventRepository, ListEventsQuery } from '../events.type.js';
+import type { IEventRepository, ListEventsQuery } from '../events.type.js';
+import { event, eventInput } from './events.fixtures.js';
 
 // events.service.ts creates the real singleton on import, which loads Prisma and needs DATABASE_URL.
 vi.mock('../events.repository.js', () => ({ eventRepository: {} }));
-
-const input: CreateEventInput = {
-  title: 'Stand-up night',
-  description: 'A live evening of stand-up comedy.',
-  category: 'comedy',
-  durationMins: 90,
-  language: 'en',
-};
-
-const event: Event = { id: '019a0000-0000-7000-8000-000000000001', ...input };
 
 const notFound = { statusCode: 404, code: 'EVENT_NOT_FOUND' };
 
@@ -61,15 +52,15 @@ describe('EventService', () => {
     it('returns the created event', async () => {
       create.mockResolvedValue(event);
 
-      await expect(service.create(input)).resolves.toEqual(event);
-      expect(create).toHaveBeenCalledWith(input);
+      await expect(service.create(eventInput)).resolves.toEqual(event);
+      expect(create).toHaveBeenCalledWith(eventInput);
     });
 
     it('passes repository errors through unchanged', async () => {
       const conflict = AppError.conflict('Event', 'An event with this title already exists');
       create.mockRejectedValue(conflict);
 
-      await expect(service.create(input)).rejects.toBe(conflict);
+      await expect(service.create(eventInput)).rejects.toBe(conflict);
     });
   });
 
