@@ -46,10 +46,38 @@ describe('events routes', () => {
     });
 
     it.each([
+      { reason: 'search', query: 'search=stand-up', filters: { search: 'stand-up' } },
+      {
+        reason: 'a trimmed search',
+        query: 'search=%20%20stand-up%20%20',
+        filters: { search: 'stand-up' },
+      },
+      { reason: 'category', query: 'category=comedy', filters: { category: 'comedy' } },
+      {
+        reason: 'search and category',
+        query: 'search=night&category=comedy',
+        filters: { search: 'night', category: 'comedy' },
+      },
+    ])('passes $reason to the repository', async ({ query, filters }) => {
+      repository.findMany.mockResolvedValue({ items: [event], total: 1 });
+
+      const res = await request(app).get(`/api/events?${query}`);
+
+      expect(res.status).toBe(200);
+      expect(repository.findMany).toHaveBeenCalledWith({ limit: 20, offset: 0, ...filters });
+      // Filters must not leak into pagination: the contract has only limit, offset and total.
+      expect(res.body).toEqual({ data: [event], pagination: { limit: 20, offset: 0, total: 1 } });
+    });
+
+    it.each([
       { reason: 'limit is 0', query: 'limit=0' },
       { reason: 'limit is above 100', query: 'limit=101' },
       { reason: 'offset is negative', query: 'offset=-1' },
       { reason: 'limit is not a number', query: 'limit=abc' },
+      { reason: 'search is empty', query: 'search=' },
+      { reason: 'search is only whitespace', query: 'search=%20%20%20' },
+      { reason: 'search is longer than 100 characters', query: `search=${'a'.repeat(101)}` },
+      { reason: 'category is unknown', query: 'category=opera' },
     ])('returns 400 when $reason', async ({ query }) => {
       const res = await request(app).get(`/api/events?${query}`);
 

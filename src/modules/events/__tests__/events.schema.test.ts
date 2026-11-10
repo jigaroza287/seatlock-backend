@@ -177,7 +177,10 @@ describe('listEventQuerySchema', () => {
     }
   });
 
-  it.each(['', '   '])('rejects a blank search term', (search) => {
+  it.each([
+    { reason: 'empty', search: '' },
+    { reason: 'only whitespace', search: '   ' },
+  ])('rejects a search term that is $reason', ({ search }) => {
     const result = listEventQuerySchema.safeParse({ search });
 
     expect(result.success).toBe(false);

@@ -36,9 +36,9 @@ describe('listQuerySchema', () => {
 
 describe('idParamSchema', () => {
   it('accepts a valid UUID', () => {
-    expect(
-      idParamSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440000' }).success
-    ).toBe(true);
+    expect(idParamSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440000' }).success).toBe(
+      true
+    );
   });
 
   it.each(['not-a-uuid', ''])('rejects an invalid id: "%s"', (id) => {
