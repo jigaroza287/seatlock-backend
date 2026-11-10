@@ -1,18 +1,20 @@
 import { type Request, type Response } from 'express';
-import { idParamSchema, listQuerySchema } from '../../shared/schema.js';
+import { idParamSchema } from '../../shared/schema.js';
 import type { IdParam } from '../../shared/types.js';
-import { createEventSchema, updateEventSchema } from './events.schema.js';
+import { createEventSchema, listEventQuerySchema, updateEventSchema } from './events.schema.js';
 import { eventService } from './events.service.js';
 import type { EventListOutput } from './events.type.js';
 
 export async function getEvents(req: Request, res: Response) {
-  const input = listQuerySchema.parse(req.query);
+  const input = listEventQuerySchema.parse(req.query);
+  const { limit, offset } = input;
   const eventListOutput: EventListOutput = await eventService.list(input);
 
   return res.status(200).json({
     data: eventListOutput.items,
     pagination: {
-      ...input,
+      limit,
+      offset,
       total: eventListOutput.total,
     },
   });
