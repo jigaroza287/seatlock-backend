@@ -9,17 +9,17 @@ Ticket booking backend: catalog, seat booking, mock payments. Core problem: **no
 
 ## Stack (versions pinned on purpose)
 
-| Tool | Version | Note |
-| --- | --- | --- |
-| Node | 24 (`.nvmrc`) | ESM only (`"type": "module"`) |
-| pnpm | 12 | Never use npm or yarn |
-| TypeScript | `~6.0` | typescript-eslint supports below 6.1; don't upgrade |
-| Express | 5 | Forwards async errors; no `asyncHandler` wrapper |
-| Zod | 4 | Validation and inferred types |
-| Prisma | 7, with `@prisma/adapter-pg` | Stay on 7; the npm `latest` tag is the v8 RC with a different API |
-| Postgres | 18 in Docker | Host port **5433** |
-| Vitest | 5 | Test runner |
-| ESLint 10 (type-aware), Prettier 3 (+ `prettier-plugin-sql`) | | Lint and format |
+| Tool                                                         | Version                      | Note                                                              |
+| ------------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------- |
+| Node                                                         | 24 (`.nvmrc`)                | ESM only (`"type": "module"`)                                     |
+| pnpm                                                         | 12                           | Never use npm or yarn                                             |
+| TypeScript                                                   | `~6.0`                       | typescript-eslint supports below 6.1; don't upgrade               |
+| Express                                                      | 5                            | Forwards async errors; no `asyncHandler` wrapper                  |
+| Zod                                                          | 4                            | Validation and inferred types                                     |
+| Prisma                                                       | 7, with `@prisma/adapter-pg` | Stay on 7; the npm `latest` tag is the v8 RC with a different API |
+| Postgres                                                     | 18 in Docker                 | Host port **5433**                                                |
+| Vitest                                                       | 5                            | Test runner                                                       |
+| ESLint 10 (type-aware), Prettier 3 (+ `prettier-plugin-sql`) |                              | Lint and format                                                   |
 
 ## Commands
 
@@ -92,7 +92,7 @@ requests.http          manual API checks
 
 ## Testing (being set up)
 
-- Vitest. Route tests use Supertest against `app` with the in-memory repository, no database.
+- Vitest. Route tests use Supertest against `app` with the mock repository, no database.
 - Integration tests run against a separate test database. Never point tests at the dev database.
 - Keep `requests.http` in sync when routes or status codes change.
 
