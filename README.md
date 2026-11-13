@@ -15,12 +15,22 @@ Backend for Seatlock, a ticket booking platform. Core problem: **no double booki
 ```bash
 pnpm install
 cp .env.example .env        # then set POSTGRES_PASSWORD and the same password in DATABASE_URL
+pnpm db:generate            # Reads schema.prisma and generates Prisma client code
 pnpm db:up                  # Postgres on 127.0.0.1:5433
 pnpm db:migrate && pnpm db:seed
 pnpm dev                    # API on http://localhost:8000
 ```
 
-Adminer (database UI) runs on http://localhost:8080 with `docker compose up -d`. Server: `db`.
+Adminer (database UI): `docker compose up -d adminer`, then http://localhost:8080. Server: `db`.
+
+## Run the API in Docker
+
+```bash
+pnpm db:up && pnpm db:migrate # migrations run from your machine
+docker compose up -d --build api # API on http://localhost:8000
+```
+
+Stop `pnpm dev` first: both use port 8000. Inside Compose the API reaches Postgres at `db:5432`.
 
 ## Environment variables
 
