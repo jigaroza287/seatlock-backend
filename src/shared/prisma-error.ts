@@ -39,13 +39,13 @@ const CHECK_FIELDS: Record<string, FieldError> = {
   venues_city_length_check: { field: 'city', message: 'Must be 1 to 100 characters' },
   screens_name_length_check: { field: 'name', message: 'Must be 1 to 100 characters' },
   seats_row_label_not_empty_check: { field: 'rowLabel', message: 'Must not be empty' },
-  seats_seat_number_positive_check: { field: 'seatNumber', message: 'Must be greater than 0' },
+  seats_seat_number_range_check: { field: 'seatNumber', message: 'Must be 1 to 100' },
   events_title_length_check: { field: 'title', message: 'Must be 1 to 100 characters' },
   events_description_length_check: {
     field: 'description',
     message: 'Must be 20 to 2000 characters',
   },
-  events_duration_mins_positive_check: { field: 'durationMins', message: 'Must be greater than 0' },
+  events_duration_mins_range_check: { field: 'durationMins', message: 'Must be 1 to 1440 minutes' },
   events_language_length_check: { field: 'language', message: 'Must be exactly 2 characters' },
   shows_price_minor_non_negative_check: { field: 'priceMinor', message: 'Must not be negative' },
 };

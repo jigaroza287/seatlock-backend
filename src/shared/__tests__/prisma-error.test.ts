@@ -136,7 +136,7 @@ describe('toAppError', () => {
       const error = prismaError('P2039', {
         originalCode: '23514',
         message:
-          'new row for relation "events" violates check constraint "events_duration_mins_positive_check"',
+          'new row for relation "events" violates check constraint "events_duration_mins_range_check"',
       });
 
       const result = toAppError(error, 'Event', 'create');
@@ -144,10 +144,10 @@ describe('toAppError', () => {
       expect(result).toMatchObject({
         statusCode: 400,
         code: 'VALIDATION_ERROR',
-        details: [{ field: 'durationMins', message: 'Must be greater than 0' }],
+        details: [{ field: 'durationMins', message: 'Must be 1 to 1440 minutes' }],
       });
       expect(warn).toHaveBeenCalledWith(
-        'Zod gap on Event: SQLSTATE 23514, constraint events_duration_mins_positive_check'
+        'Zod gap on Event: SQLSTATE 23514, constraint events_duration_mins_range_check'
       );
     });
 

@@ -4,16 +4,18 @@ import { listQuerySchema } from '../../shared/schema.js';
 export const CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as const;
 export const CategorySchema = z.enum(CATEGORIES);
 
-export const createEventSchema = z.object({
-  title: z.string().trim().min(1).max(100),
-  description: z.string().trim().min(20).max(2000),
-  category: CategorySchema,
-  durationMins: z.number().int().positive(),
-  language: z
-    .string()
-    .trim()
-    .regex(/^[a-z]{2}$/),
-});
+export const createEventSchema = z
+  .object({
+    title: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(20).max(2000),
+    category: CategorySchema,
+    durationMins: z.number().int().positive().max(1440),
+    language: z
+      .string()
+      .trim()
+      .regex(/^[a-z]{2}$/),
+  })
+  .strict();
 
 export const updateEventSchema = createEventSchema
   .partial()
