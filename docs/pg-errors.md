@@ -56,7 +56,7 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | `shows_event_id_fkey`   | `eventId`  | Event does not exist   |
 | `shows_screen_id_fkey`  | `screenId` | Screen does not exist  |
 
-Put the field in `details`, e.g. `{ venueId: ["Venue does not exist"] }`, so it matches the Zod error shape.
+Put the field in `details`, e.g. `[{ field: "venueId", message: "Venue does not exist" }]`, so it matches the Zod error shape.
 
 ### 23001 restrict_violation (delete) → 409
 
@@ -77,10 +77,10 @@ Put the field in `details`, e.g. `{ venueId: ["Venue does not exist"] }`, so it 
 | `venues_city_length_check`                      | Trimmed city 1 to 100 chars          | `city`         |
 | `screens_name_length_check`                     | Trimmed name 1 to 100 chars          | `name`         |
 | `seats_row_label_not_empty_check`               | Trimmed row label not empty          | `rowLabel`     |
-| `seats_seat_number_positive_check`              | `seat_number > 0`                    | `seatNumber`   |
+| `seats_seat_number_range_check`                 | `seat_number` 1 to 100               | `seatNumber`   |
 | `events_title_length_check`                     | Trimmed title 1 to 100 chars         | `title`        |
 | `events_description_length_check`               | Trimmed description 20 to 2000 chars | `description`  |
-| `events_duration_mins_positive_check`           | `duration_mins > 0`                  | `durationMins` |
+| `events_duration_mins_range_check`              | `duration_mins` 1 to 1440            | `durationMins` |
 | `events_language_length_check`                  | Trimmed language exactly 2 chars     | `language`     |
 | `shows_price_minor_non_negative_check`          | `price_minor >= 0`                   | `priceMinor`   |
 | `seat_categories_sort_order_non_negative_check` | Reference data only                  | 500            |
