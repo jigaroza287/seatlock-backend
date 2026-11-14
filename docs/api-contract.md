@@ -122,12 +122,12 @@ Sorted by `title` ascending.
 
 ### Venue object
 
-| Field   | Type           | Required on create | Rules                                                      |
-| ------- | -------------- | ------------------ | ---------------------------------------------------------- |
-| id      | string         | No (server)        | UUID v7; read-only                                         |
-| name    | string         | Yes                | 1 to 100 characters; `(name, city)` is unique              |
-| city    | string         | Yes                | 1 to 100 characters                                        |
-| address | string \| null | No                 | Optional; `null` when not set. PATCH with `null` clears it |
+| Field   | Type           | Required on create | Rules                                                                                                      |
+| ------- | -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| id      | string         | No (server)        | UUID v7; read-only                                                                                         |
+| name    | string         | Yes                | 1 to 100 characters; `(name, city)` is unique                                                              |
+| city    | string         | Yes                | 1 to 100 characters                                                                                        |
+| address | string \| null | No                 | 1 to 500 characters; `null` when not set. POST may omit it but rejects `null`. PATCH with `null` clears it |
 
 ### Venue list filters
 

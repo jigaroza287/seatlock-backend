@@ -15,6 +15,8 @@ const repository = vi.hoisted(() => ({
   delete: vi.fn<IEventRepository['delete']>(),
 }));
 vi.mock('../events.repository.js', () => ({ eventRepository: repository }));
+// app.ts also loads the other modules' repositories; stop them creating a real Prisma client.
+vi.mock('../../../db/prisma.js', () => ({ prisma: {} }));
 
 const eventUrl = `/api/events/${event.id}`;
 
