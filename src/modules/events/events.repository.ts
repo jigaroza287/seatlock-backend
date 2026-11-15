@@ -1,6 +1,6 @@
 import { prisma } from '../../db/prisma.js';
-import { Prisma, type Event as EventRow } from '../../generated/prisma/client.js';
-import { toAppError } from '../../shared/prisma-error.js';
+import { type Event as EventRow } from '../../generated/prisma/client.js';
+import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
 import { CategorySchema } from './events.schema.js';
 import type {
   CreateEventInput,
@@ -20,11 +20,6 @@ function toEvent(row: EventRow): Event {
     durationMins: row.durationMins,
     language: row.language,
   };
-}
-
-// P2025: update or delete found no row with this id.
-function isRecordNotFound(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
 class EventRepository implements IEventRepository {

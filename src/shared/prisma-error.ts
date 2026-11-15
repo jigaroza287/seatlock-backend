@@ -144,3 +144,8 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
       return err;
   }
 }
+
+// P2025: update or delete found no row with this id.
+export function isRecordNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+}

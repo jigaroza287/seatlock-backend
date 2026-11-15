@@ -81,3 +81,61 @@ GET {{baseUrl}}/events?limit=1&offset=0
 
 ### Verify the delete worked (404), run after "Delete event"
 GET {{baseUrl}}/events/{{createEvent.response.body.$.data.id}}
+
+### Create venue (201)
+# @name createVenue
+POST {{baseUrl}}/venues
+Content-Type: application/json
+
+{ "name": "Main hall", "city": "Pune", "address": "12 Station Road" }
+
+### Get the venue just created (200)
+GET {{baseUrl}}/venues/{{createVenue.response.body.$.data.id}}
+
+### Create venue without address (201, address is null)
+POST {{baseUrl}}/venues
+Content-Type: application/json
+
+{ "name": "Main hall", "city": "Mumbai" }
+
+### List venues (200, sorted by name then city)
+GET {{baseUrl}}/venues
+
+### Filter by search and city (200, city is a case-insensitive exact match)
+GET {{baseUrl}}/venues?search=hall&city=pune
+
+### Same name in the same city (409), run after "Create venue"
+POST {{baseUrl}}/venues
+Content-Type: application/json
+
+{ "name": "Main hall", "city": "Pune" }
+
+### Null address on create (400, POST can only omit it)
+POST {{baseUrl}}/venues
+Content-Type: application/json
+
+{ "name": "Side hall", "city": "Pune", "address": null }
+
+### Clear the address (200, address must be null)
+PATCH {{baseUrl}}/venues/{{createVenue.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "address": null }
+
+### Rename onto an existing name in the same city (409), run after "Create venue without address"
+PATCH {{baseUrl}}/venues/{{createVenue.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "city": "Mumbai" }
+
+### Read-only id in PATCH (400, strict schema)
+PATCH {{baseUrl}}/venues/{{createVenue.response.body.$.data.id}}
+Content-Type: application/json
+
+{ "id": "abc" }
+
+### Unknown venue id (404)
+GET {{baseUrl}}/venues/019a0000-0000-7000-8000-000000000999
+
+### Delete venue (204)
+DELETE {{baseUrl}}/venues/{{createVenue.response.body.$.data.id}}
