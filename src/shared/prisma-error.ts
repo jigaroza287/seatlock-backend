@@ -37,6 +37,7 @@ const RESTRICT_MESSAGES: Record<string, string> = {
 const CHECK_FIELDS: Record<string, FieldError> = {
   venues_name_length_check: { field: 'name', message: 'Must be 1 to 100 characters' },
   venues_city_length_check: { field: 'city', message: 'Must be 1 to 100 characters' },
+  venues_address_length_check: { field: 'address', message: 'Must be 1 to 500 characters' },
   screens_name_length_check: { field: 'name', message: 'Must be 1 to 100 characters' },
   seats_row_label_not_empty_check: { field: 'rowLabel', message: 'Must not be empty' },
   seats_seat_number_range_check: { field: 'seatNumber', message: 'Must be 1 to 100' },

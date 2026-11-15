@@ -75,6 +75,7 @@ Put the field in `details`, e.g. `[{ field: "venueId", message: "Venue does not 
 | ----------------------------------------------- | ------------------------------------ | -------------- |
 | `venues_name_length_check`                      | Trimmed name 1 to 100 chars          | `name`         |
 | `venues_city_length_check`                      | Trimmed city 1 to 100 chars          | `city`         |
+| `venues_address_length_check`                   | Trimmed address 1 to 500 chars       | `address`      |
 | `screens_name_length_check`                     | Trimmed name 1 to 100 chars          | `name`         |
 | `seats_row_label_not_empty_check`               | Trimmed row label not empty          | `rowLabel`     |
 | `seats_seat_number_range_check`                 | `seat_number` 1 to 100               | `seatNumber`   |
