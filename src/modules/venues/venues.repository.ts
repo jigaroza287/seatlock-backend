@@ -1,5 +1,5 @@
 import { prisma } from '../../db/prisma.js';
-import { type Venue as VenueRow } from '../../generated/prisma/client.js';
+import { type PrismaClient, type Venue as VenueRow } from '../../generated/prisma/client.js';
 import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
 import type {
   CreateVenueInput,
@@ -20,27 +20,29 @@ function toVenue(row: VenueRow): Venue {
 }
 
 class VenueRepository implements IVenueRepository {
+  constructor(private readonly db: PrismaClient) {}
+
   async findMany(query: ListVenuesQuery): Promise<VenueListOutput> {
     const where = {
       name: query.search ? { contains: query.search, mode: 'insensitive' as const } : undefined,
       city: query.city ? { equals: query.city, mode: 'insensitive' as const } : undefined,
     };
 
-    const [rows, total] = await prisma.$transaction([
-      prisma.venue.findMany({
+    const [rows, total] = await this.db.$transaction([
+      this.db.venue.findMany({
         where,
         orderBy: [{ name: 'asc' }, { city: 'asc' }],
         skip: query.offset,
         take: query.limit,
       }),
-      prisma.venue.count({ where }),
+      this.db.venue.count({ where }),
     ]);
 
     return { items: rows.map(toVenue), total };
   }
 
   async findById(id: string): Promise<Venue | null> {
-    const row = await prisma.venue.findUnique({ where: { id } });
+    const row = await this.db.venue.findUnique({ where: { id } });
     if (!row) {
       return null;
     }
@@ -50,7 +52,7 @@ class VenueRepository implements IVenueRepository {
   async create(input: CreateVenueInput): Promise<Venue> {
     const { name, city, address } = input;
     try {
-      const newVenue = await prisma.venue.create({
+      const newVenue = await this.db.venue.create({
         data: {
           name,
           city,
@@ -65,7 +67,7 @@ class VenueRepository implements IVenueRepository {
 
   async update(id: string, changes: UpdateVenueInput): Promise<Venue | null> {
     try {
-      const updatedVenue = await prisma.venue.update({ where: { id }, data: changes });
+      const updatedVenue = await this.db.venue.update({ where: { id }, data: changes });
       return toVenue(updatedVenue);
     } catch (error: unknown) {
       if (isRecordNotFound(error)) {
@@ -77,7 +79,7 @@ class VenueRepository implements IVenueRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
-      await prisma.venue.delete({ where: { id } });
+      await this.db.venue.delete({ where: { id } });
       return true;
     } catch (error: unknown) {
       if (isRecordNotFound(error)) {
@@ -88,4 +90,4 @@ class VenueRepository implements IVenueRepository {
   }
 }
 
-export const venueRepository: IVenueRepository = new VenueRepository();
+export const venueRepository: IVenueRepository = new VenueRepository(prisma);

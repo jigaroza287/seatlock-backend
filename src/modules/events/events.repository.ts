@@ -1,5 +1,5 @@
 import { prisma } from '../../db/prisma.js';
-import { type Event as EventRow } from '../../generated/prisma/client.js';
+import { type PrismaClient, type Event as EventRow } from '../../generated/prisma/client.js';
 import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
 import { CategorySchema } from './events.schema.js';
 import type {
@@ -23,27 +23,29 @@ function toEvent(row: EventRow): Event {
 }
 
 class EventRepository implements IEventRepository {
+  constructor(private readonly db: PrismaClient) {}
+
   async findMany(query: ListEventsQuery): Promise<EventListOutput> {
     const where = {
       title: query.search ? { contains: query.search, mode: 'insensitive' as const } : undefined,
       category: query.category,
     };
 
-    const [rows, total] = await prisma.$transaction([
-      prisma.event.findMany({
+    const [rows, total] = await this.db.$transaction([
+      this.db.event.findMany({
         where,
         orderBy: { title: 'asc' },
         skip: query.offset,
         take: query.limit,
       }),
-      prisma.event.count({ where }),
+      this.db.event.count({ where }),
     ]);
 
     return { items: rows.map(toEvent), total };
   }
 
   async findById(id: string): Promise<Event | null> {
-    const row = await prisma.event.findUnique({ where: { id } });
+    const row = await this.db.event.findUnique({ where: { id } });
     if (!row) {
       return null;
     }
@@ -53,7 +55,7 @@ class EventRepository implements IEventRepository {
   async create(input: CreateEventInput): Promise<Event> {
     const { title, description, category, durationMins, language } = input;
     try {
-      const newEvent = await prisma.event.create({
+      const newEvent = await this.db.event.create({
         data: {
           title,
           description,
@@ -70,7 +72,7 @@ class EventRepository implements IEventRepository {
 
   async update(id: string, changes: UpdateEventInput): Promise<Event | null> {
     try {
-      const updatedEvent = await prisma.event.update({ where: { id }, data: changes });
+      const updatedEvent = await this.db.event.update({ where: { id }, data: changes });
       return toEvent(updatedEvent);
     } catch (error: unknown) {
       if (isRecordNotFound(error)) {
@@ -82,7 +84,7 @@ class EventRepository implements IEventRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
-      await prisma.event.delete({ where: { id } });
+      await this.db.event.delete({ where: { id } });
       return true;
     } catch (error: unknown) {
       if (isRecordNotFound(error)) {
@@ -93,4 +95,4 @@ class EventRepository implements IEventRepository {
   }
 }
 
-export const eventRepository: IEventRepository = new EventRepository();
+export const eventRepository: IEventRepository = new EventRepository(prisma);
