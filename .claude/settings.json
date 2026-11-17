@@ -20,7 +20,7 @@
       "Bash(docker *)",
       "Edit(./prisma/migrations/**)",
       "Edit(./package.json)",
-      "Edit(./docker-compose.yml)"
+      "Edit(./compose.yaml)"
     ],
     "deny": [
       "Bash(git add *)",

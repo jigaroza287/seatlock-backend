@@ -4,7 +4,7 @@ Ticket booking backend: catalog, seat booking, mock payments. Core problem: **no
 
 ## Scope guard
 
-- Don't add frameworks, libraries or infrastructure that aren't already in `package.json` or `docker-compose.yml`. Ask first.
+- Don't add frameworks, libraries or infrastructure that aren't already in `package.json` or `compose.yaml`. Ask first.
 - Build what the task needs, nothing for later stages.
 
 ## Stack (versions pinned on purpose)
