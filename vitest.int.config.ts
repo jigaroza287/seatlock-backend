@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 
 // Load test database settings before workers start; they inherit process.env
-process.loadEnvFile('.env.test');
+if (existsSync('.env.test')) process.loadEnvFile('.env.test');
 
 // Standalone on purpose: mergeConfig concatenates arrays, so the unit include/exclude would leak in
 export default defineConfig({

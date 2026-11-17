@@ -1,0 +1,22 @@
+name: Setup Node and pnpm
+description: Setup Node.js, pnpm and install dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Setup Node 24
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: 'pnpm'
+
+    - name: Install deps
+      run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - name: Prisma generate
+      run: pnpm db:generate
+      shell: bash

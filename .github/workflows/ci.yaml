@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Base Setup
+        uses: ./.github/actions/setup
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+  type-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Base Setup
+        uses: ./.github/actions/setup
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Base Setup
+        uses: ./.github/actions/setup
+
+      - name: Unit Test
+        run: pnpm test
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: seatlock
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: seatlock_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U seatlock -d seatlock_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://seatlock:ci_only_password@localhost:5432/seatlock_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Base Setup
+        uses: ./.github/actions/setup
+
+      - name: Integration Test
+        run: pnpm test:int
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Only for the smoke test: the server runs SELECT 1 on startup and exits if the database is unreachable
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: seatlock
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: seatlock_smoke
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U seatlock -d seatlock_smoke"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # No push until CD (M4). load keeps the image on the runner for the smoke test.
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: seatlock-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Proves the built image starts and serves HTTP. Any status code counts; 000 means nothing is listening.
+      - name: Smoke test
+        run: |
+          docker run -d --name api --network host \
+            -e DATABASE_URL=postgresql://seatlock:ci_only_password@localhost:5432/seatlock_smoke \
+            seatlock-backend:ci
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ || true)
+            if [ "$code" != "000" ]; then
+              echo "API answered with HTTP $code"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not start within 15s"
+          docker logs api
+          exit 1
