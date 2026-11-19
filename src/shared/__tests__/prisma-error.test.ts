@@ -94,6 +94,38 @@ describe('toAppError', () => {
       });
     });
 
+    it.each(['create', 'update'] as const)(
+      'returns 404 for the parent on %s when the FK id comes from the path',
+      (operation) => {
+        const error = prismaError('P2003', {
+          originalCode: '23503',
+          constraint: { index: 'screens_venue_id_fkey' },
+        });
+
+        const result = toAppError(error, 'Screen', operation);
+
+        expect(result).toBeInstanceOf(AppError);
+        expect(result).toMatchObject({
+          statusCode: 404,
+          code: 'VENUE_NOT_FOUND',
+          message: 'Venue does not exist',
+        });
+      }
+    );
+
+    it('still returns 409 on delete for a path parent FK (23001)', () => {
+      const error = prismaError('P2003', {
+        originalCode: '23001',
+        constraint: { index: 'screens_venue_id_fkey' },
+      });
+
+      expect(toAppError(error, 'Venue', 'delete')).toMatchObject({
+        statusCode: 409,
+        code: 'VENUE_CONFLICT',
+        message: 'Venue still has screens',
+      });
+    });
+
     it('returns 400 with field details on create for a known constraint (23503)', () => {
       const error = prismaError('P2003', {
         originalCode: '23503',

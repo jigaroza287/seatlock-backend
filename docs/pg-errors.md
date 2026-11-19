@@ -17,6 +17,7 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | -------- | --------------------------- | -------------------------------------------- | ------- | ----------------------- |
 | `23505`  | unique_violation            | Row already exists                           | **409** | `<ENTITY>_CONFLICT`     |
 | `23503`  | foreign_key_violation       | Insert or update points to a missing parent  | **400** | `VALIDATION_ERROR`      |
+| `23503`  | foreign_key_violation       | Same, parent id comes from the URL path      | **404** | `<PARENT>_NOT_FOUND`    |
 | `23001`  | restrict_violation          | Delete blocked by `ON DELETE RESTRICT`       | **409** | `<ENTITY>_CONFLICT`     |
 | `23514`  | check_violation             | Value breaks a CHECK (Zod gap)               | **400** | `VALIDATION_ERROR`      |
 | `23502`  | not_null_violation          | Required column missing (Zod gap)            | **400** | `VALIDATION_ERROR`      |
@@ -39,7 +40,7 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | Constraint                                  | Trigger                                  | API code          | Message                                              |
 | ------------------------------------------- | ---------------------------------------- | ----------------- | ---------------------------------------------------- |
 | `venues_name_city_key`                      | Same venue name in the same city         | `VENUE_CONFLICT`  | A venue with this name already exists in this city   |
-| `screens_venue_id_name_key`                 | Same screen name at the same venue       | `SCREEN_CONFLICT` | A screen with this name already exists at this venue |
+| `screens_venue_id_name_lower_key`           | Same screen name at the same venue       | `SCREEN_CONFLICT` | A screen with this name already exists at this venue |
 | `seats_screen_id_row_label_seat_number_key` | Same row and number on the same screen   | `SEAT_CONFLICT`   | This seat already exists on this screen              |
 | `events_title_lower_key`                    | Duplicate event title                    | `EVENT_CONFLICT`  | An event with this title already exists              |
 | `shows_screen_id_starts_at_key`             | Two shows on one screen at the same time | `SHOW_CONFLICT`   | This screen already has a show at this time          |
@@ -47,16 +48,23 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 
 ### 23503 foreign_key_violation (insert or update) → 400
 
-| Constraint              | Field      | Message                |
-| ----------------------- | ---------- | ---------------------- |
-| `screens_venue_id_fkey` | `venueId`  | Venue does not exist   |
-| `seats_screen_id_fkey`  | `screenId` | Screen does not exist  |
-| `seats_category_fkey`   | `category` | Unknown seat category  |
-| `events_category_fkey`  | `category` | Unknown event category |
-| `shows_event_id_fkey`   | `eventId`  | Event does not exist   |
-| `shows_screen_id_fkey`  | `screenId` | Screen does not exist  |
+| Constraint             | Field      | Message                |
+| ---------------------- | ---------- | ---------------------- |
+| `seats_screen_id_fkey` | `screenId` | Screen does not exist  |
+| `seats_category_fkey`  | `category` | Unknown seat category  |
+| `events_category_fkey` | `category` | Unknown event category |
+| `shows_event_id_fkey`  | `eventId`  | Event does not exist   |
+| `shows_screen_id_fkey` | `screenId` | Screen does not exist  |
 
-Put the field in `details`, e.g. `[{ field: "venueId", message: "Venue does not exist" }]`, so it matches the Zod error shape.
+Put the field in `details`, e.g. `[{ field: "eventId", message: "Event does not exist" }]`, so it matches the Zod error shape.
+
+### 23503 foreign_key_violation (insert or update, parent id from the path) → 404
+
+| Constraint              | Path param | API code          | Message              |
+| ----------------------- | ---------- | ----------------- | -------------------- |
+| `screens_venue_id_fkey` | `venueId`  | `VENUE_NOT_FOUND` | Venue does not exist |
+
+These FKs only ever receive an id from the path, so the constraint name is enough to return 404. If one ever gets ids from both the path and a body, revisit this mapping.
 
 ### 23001 restrict_violation (delete) → 409
 
