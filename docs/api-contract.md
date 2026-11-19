@@ -156,11 +156,11 @@ A screen belongs to one venue. Create and list are nested under the venue; singl
 
 ### Screen object
 
-| Field   | Type   | Required on create | Rules                                                     |
-| ------- | ------ | ------------------ | --------------------------------------------------------- |
-| id      | string | No (server)        | UUID v7; read-only                                        |
-| venueId | string | No (from path)     | UUID v7; read-only, a screen cannot move to another venue |
-| name    | string | Yes                | 1 to 100 characters; unique within the venue              |
+| Field   | Type   | Required on create | Rules                                                          |
+| ------- | ------ | ------------------ | -------------------------------------------------------------- |
+| id      | string | No (server)        | UUID v7; read-only                                             |
+| venueId | string | No (from path)     | UUID v7; read-only, a screen cannot move to another venue      |
+| name    | string | Yes                | 1 to 100 characters; unique within the venue, case-insensitive |
 
 Sorted by `name` ascending.
 
