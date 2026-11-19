@@ -10,15 +10,20 @@ type FieldError = { field: string; message: string };
 // 23505 unique_violation -> 409
 const UNIQUE_MESSAGES: Record<string, string> = {
   venues_name_city_key: 'A venue with this name already exists in this city',
-  screens_venue_id_name_key: 'A screen with this name already exists at this venue',
+  screens_venue_id_name_lower_key: 'A screen with this name already exists at this venue',
   seats_screen_id_row_label_seat_number_key: 'This seat already exists on this screen',
   events_title_lower_key: 'An event with this title already exists',
   shows_screen_id_starts_at_key: 'This screen already has a show at this time',
 };
 
-// 23503 foreign_key_violation on create or update -> 400
+// 23503 foreign_key_violation on create or update, parent id from the URL path -> 404
+// Value is the parent entity. Only valid while the FK gets its id from the path alone.
+const PATH_PARENT_FKS: Record<string, string> = {
+  screens_venue_id_fkey: 'Venue',
+};
+
+// 23503 foreign_key_violation on create or update, referenced id from the body -> 400
 const FOREIGN_KEY_FIELDS: Record<string, FieldError> = {
-  screens_venue_id_fkey: { field: 'venueId', message: 'Venue does not exist' },
   seats_screen_id_fkey: { field: 'screenId', message: 'Screen does not exist' },
   seats_category_fkey: { field: 'category', message: 'Unknown seat category' },
   events_category_fkey: { field: 'category', message: 'Unknown event category' },
@@ -116,6 +121,10 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
       if (operation === 'delete') {
         const message = RESTRICT_MESSAGES[constraint] ?? `${entity} is still referenced`;
         return AppError.conflict(entity, message);
+      }
+      const parent = PATH_PARENT_FKS[constraint];
+      if (parent) {
+        return AppError.notFound(parent, `${parent} does not exist`);
       }
       const fieldError = FOREIGN_KEY_FIELDS[constraint];
       return fieldError ? validationError([fieldError]) : validationError();
