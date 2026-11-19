@@ -8,3 +8,7 @@ export const listQuerySchema = z.object({
 export const idParamSchema = z.object({
   id: z.uuid(),
 });
+
+export const venueIdParamSchema = z.object({
+  venueId: z.uuid(),
+});
