@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createSeatSchema, listSeatQuerySchema, updateSeatSchema } from '../seats.schema.js';
-import { seatInput } from './seats.fixtures.js';
+import {
+  createSeatSchema,
+  listSeatQuerySchema,
+  seatLayoutSchema,
+  updateSeatSchema,
+} from '../seats.schema.js';
+import { seatInput, seatLayoutInput } from './seats.fixtures.js';
 
 describe('createSeatSchema', () => {
   it('accepts a valid seat', () => {
@@ -8,18 +13,19 @@ describe('createSeatSchema', () => {
   });
 
   it('trims and uppercases the row label', () => {
-    const result = createSeatSchema.safeParse({ ...seatInput, rowLabel: '  aa  ' });
+    const result = createSeatSchema.safeParse({ ...seatInput, rowLabel: '  b  ' });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.rowLabel).toBe('AA');
+      expect(result.data.rowLabel).toBe('B');
     }
   });
 
   it.each([
     { reason: 'only whitespace', rowLabel: '   ' },
     { reason: 'blank', rowLabel: '' },
-    { reason: 'more than 10 characters long', rowLabel: 'A'.repeat(11) },
+    { reason: 'two letters', rowLabel: 'AA' },
+    { reason: 'a digit', rowLabel: '1' },
     { reason: 'not a string', rowLabel: 1 },
   ])('rejects a row label that is $reason', ({ rowLabel }) => {
     const result = createSeatSchema.safeParse({ ...seatInput, rowLabel });
@@ -28,10 +34,8 @@ describe('createSeatSchema', () => {
     expect(result.error?.issues[0]?.path).toEqual(['rowLabel']);
   });
 
-  it.each([1, 10])('accepts a row label of %i characters', (length) => {
-    expect(createSeatSchema.safeParse({ ...seatInput, rowLabel: 'A'.repeat(length) }).success).toBe(
-      true
-    );
+  it.each(['A', 'Z'])('accepts row label %s', (rowLabel) => {
+    expect(createSeatSchema.safeParse({ ...seatInput, rowLabel }).success).toBe(true);
   });
 
   it.each([
@@ -132,5 +136,115 @@ describe('listSeatQuerySchema', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['category']);
+  });
+});
+
+describe('seatLayoutSchema', () => {
+  const row = { rowLabel: 'A', seatCount: 10, category: 'standard' };
+
+  it('accepts a valid layout', () => {
+    expect(seatLayoutSchema.safeParse(seatLayoutInput).success).toBe(true);
+  });
+
+  it('trims and uppercases the row labels', () => {
+    const result = seatLayoutSchema.safeParse({ rows: [{ ...row, rowLabel: ' b ' }] });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rows[0]?.rowLabel).toBe('B');
+    }
+  });
+
+  it.each(['A', 'Z'])('accepts row label %s', (rowLabel) => {
+    expect(seatLayoutSchema.safeParse({ rows: [{ ...row, rowLabel }] }).success).toBe(true);
+  });
+
+  it.each([
+    { reason: 'blank', rowLabel: '   ' },
+    { reason: 'two letters', rowLabel: 'AA' },
+    { reason: 'three letters', rowLabel: 'AAA' },
+    { reason: 'a digit', rowLabel: 'A1' },
+    { reason: 'a symbol', rowLabel: 'A-' },
+    { reason: 'not a string', rowLabel: 1 },
+  ])('rejects a row label that is $reason', ({ rowLabel }) => {
+    const result = seatLayoutSchema.safeParse({ rows: [{ ...row, rowLabel }] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['rows', 0, 'rowLabel']);
+  });
+
+  it.each([1, 100])('accepts a seat count of %i', (seatCount) => {
+    expect(seatLayoutSchema.safeParse({ rows: [{ ...row, seatCount }] }).success).toBe(true);
+  });
+
+  it.each([
+    { reason: '0', seatCount: 0 },
+    { reason: 'above 100', seatCount: 101 },
+    { reason: 'not an integer', seatCount: 2.5 },
+    { reason: 'a string', seatCount: '10' },
+  ])('rejects a seat count that is $reason', ({ seatCount }) => {
+    const result = seatLayoutSchema.safeParse({ rows: [{ ...row, seatCount }] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['rows', 0, 'seatCount']);
+  });
+
+  it('rejects an unknown category', () => {
+    const result = seatLayoutSchema.safeParse({ rows: [{ ...row, category: 'vip' }] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['rows', 0, 'category']);
+  });
+
+  it('rejects the same row label twice, ignoring case', () => {
+    const result = seatLayoutSchema.safeParse({ rows: [row, { ...row, rowLabel: 'a' }] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['rows', 1, 'rowLabel']);
+  });
+
+  it('rejects an empty rows array', () => {
+    const result = seatLayoutSchema.safeParse({ rows: [] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['rows']);
+  });
+
+  describe('row limit', () => {
+    // Labels A..Z, then wrapping back to A.
+    function rowsOf(count: number) {
+      return Array.from({ length: count }, (_, index) => ({
+        ...row,
+        rowLabel: String.fromCharCode(65 + (index % 26)),
+      }));
+    }
+
+    it('accepts 26 rows, A to Z', () => {
+      expect(seatLayoutSchema.safeParse({ rows: rowsOf(26) }).success).toBe(true);
+    });
+
+    // A 27th row must repeat a letter, so a duplicate issue may come too; check for the size issue.
+    it('rejects 27 rows as too many', () => {
+      const result = seatLayoutSchema.safeParse({ rows: rowsOf(27) });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues).toContainEqual(
+        expect.objectContaining({ code: 'too_big', path: ['rows'] })
+      );
+    });
+  });
+
+  it('rejects a missing rows field', () => {
+    expect(seatLayoutSchema.safeParse({}).success).toBe(false);
+  });
+
+  it.each([
+    { reason: 'the body', body: { ...seatLayoutInput, screenId: 'x' }, key: 'screenId' },
+    { reason: 'a row', body: { rows: [{ ...row, seatNumber: 1 }] }, key: 'seatNumber' },
+  ])('rejects an unknown key in $reason', ({ body, key }) => {
+    const result = seatLayoutSchema.safeParse(body);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ code: 'unrecognized_keys', keys: [key] });
   });
 });

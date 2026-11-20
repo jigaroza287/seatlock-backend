@@ -1,6 +1,7 @@
 import { prisma } from '../../db/prisma.js';
 import { type PrismaClient, type Seat as SeatRow } from '../../generated/prisma/client.js';
-import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
+import { AppError } from '../../shared/app-error.js';
+import { isRecordNotFound, isUniqueViolation, toAppError } from '../../shared/prisma-error.js';
 import { seatCategorySchema } from './seats.schema.js';
 import type {
   CreateSeatInput,
@@ -8,6 +9,7 @@ import type {
   ListSeatsQuery,
   Seat,
   SeatListOutput,
+  SeatWithoutId,
   UpdateSeatInput,
 } from './seats.type.js';
 
@@ -62,6 +64,23 @@ class SeatRepository implements ISeatRepository {
       });
       return toSeat(newSeat);
     } catch (error: unknown) {
+      throw toAppError(error, 'Seat', 'create');
+    }
+  }
+
+  // One INSERT, so all or nothing: any overlap with existing seats rejects the whole layout.
+  // A missing screen fails on seats_screen_id_fkey, which toAppError maps to SCREEN_NOT_FOUND.
+  async createMany(input: SeatWithoutId[]): Promise<number> {
+    try {
+      const insertedRows = await this.db.seat.createMany({
+        data: input,
+      });
+
+      return insertedRows.count;
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) {
+        throw AppError.conflict('Seat', 'Some seats in this layout already exist on this screen');
+      }
       throw toAppError(error, 'Seat', 'create');
     }
   }

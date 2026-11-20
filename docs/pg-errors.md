@@ -46,6 +46,8 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | `shows_screen_id_starts_at_key`             | Two shows on one screen at the same time | `SHOW_CONFLICT`   | This screen already has a show at this time          |
 | `seat_categories_sort_order_key`            | Reference data only                      | n/a               | 500                                                  |
 
+**Exception: seat layout.** `POST /api/screens/:screenId/seats/layout` inserts many seats in one statement, so a hit on `seats_screen_id_row_label_seat_number_key` can't say which seat clashed. The repository catches it with `isUniqueViolation()` before `toAppError` and returns `SEAT_CONFLICT` with the message `Some seats in this layout already exist on this screen`. The whole insert is rolled back.
+
 ### 23503 foreign_key_violation (insert or update) → 400
 
 | Constraint             | Field      | Message                |

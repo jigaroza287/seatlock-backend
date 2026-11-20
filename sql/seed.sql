@@ -2,7 +2,7 @@
 -- Run after schema.sql. Safe to re-run: it clears catalog tables first.
 -- Lookup tables (event_categories, seat_categories) are reference data and live in schema.sql.
 --
--- Fixed UUID v7-format ids so requests.http and queries can use them:
+-- Fixed UUID v7-format ids so queries can use them:
 --   venues  ...0101+   screens ...0201+   events ...0301+   shows ...0401+
 -- Seats use generated ids (nothing references them yet).
 --

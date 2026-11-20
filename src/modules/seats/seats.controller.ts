@@ -1,7 +1,12 @@
 import { type Request, type Response } from 'express';
 import { idParamSchema, screenIdParamSchema } from '../../shared/schema.js';
 import type { IdParam, ScreenIdParam } from '../../shared/types.js';
-import { createSeatSchema, listSeatQuerySchema, updateSeatSchema } from './seats.schema.js';
+import {
+  createSeatSchema,
+  listSeatQuerySchema,
+  seatLayoutSchema,
+  updateSeatSchema,
+} from './seats.schema.js';
 import { seatService } from './seats.service.js';
 import type { SeatListOutput } from './seats.type.js';
 
@@ -49,4 +54,12 @@ export async function deleteSeat(req: Request<IdParam>, res: Response) {
   const { id } = idParamSchema.parse(req.params);
   await seatService.remove(id);
   res.sendStatus(204);
+}
+
+export async function addSeatLayout(req: Request<ScreenIdParam>, res: Response) {
+  const { screenId } = screenIdParamSchema.parse(req.params);
+  const input = seatLayoutSchema.parse(req.body);
+
+  const createdCount = await seatService.generateLayout(screenId, input);
+  return res.status(201).json({ data: { screenId, createdCount } });
 }

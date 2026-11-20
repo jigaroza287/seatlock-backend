@@ -2,7 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/db/prisma.js';
-import { seatInput } from '../../src/modules/seats/__tests__/seats.fixtures.js';
+import { seatInput, seatLayoutInput } from '../../src/modules/seats/__tests__/seats.fixtures.js';
 import type { CreateSeatInput, Seat } from '../../src/modules/seats/seats.type.js';
 import { venueInput } from '../../src/modules/venues/__tests__/venues.fixtures.js';
 
@@ -210,6 +210,105 @@ describe('seats integration', () => {
 
       expect(res.status).toBe(404);
       expect(res.body).toMatchObject({ error: { code: 'SEAT_NOT_FOUND' } });
+    });
+  });
+
+  describe('POST /api/screens/:screenId/seats/layout', () => {
+    const layoutUrl = (id: string) => `/api/screens/${id}/seats/layout`;
+
+    function seatCount(id: string): Promise<number> {
+      return prisma.seat.count({ where: { screenId: id } });
+    }
+
+    it('creates every seat in the layout, numbered from 1 per row, with the row category', async () => {
+      const res = await request(app).post(layoutUrl(screenId)).send(seatLayoutInput);
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ data: { screenId, createdCount: 5 } });
+
+      const seats = await prisma.seat.findMany({
+        where: { screenId },
+        orderBy: [{ rowLabel: 'asc' }, { seatNumber: 'asc' }],
+        select: { rowLabel: true, seatNumber: true, category: true },
+      });
+      expect(seats).toEqual([
+        { rowLabel: 'A', seatNumber: 1, category: 'standard' },
+        { rowLabel: 'A', seatNumber: 2, category: 'standard' },
+        { rowLabel: 'B', seatNumber: 1, category: 'premium' },
+        { rowLabel: 'B', seatNumber: 2, category: 'premium' },
+        { rowLabel: 'B', seatNumber: 3, category: 'premium' },
+      ]);
+    });
+
+    it('stores lowercase row labels in uppercase', async () => {
+      const res = await request(app)
+        .post(layoutUrl(screenId))
+        .send({ rows: [{ rowLabel: 'b', seatCount: 2, category: 'recliner' }] });
+
+      expect(res.status).toBe(201);
+      const labels = await prisma.seat.findMany({
+        where: { screenId },
+        select: { rowLabel: true },
+      });
+      expect(labels).toEqual([{ rowLabel: 'B' }, { rowLabel: 'B' }]);
+    });
+
+    // seats_screen_id_fkey raises 23503, which maps to 404 because the screen id is in the path.
+    it('returns 404 when the screen does not exist', async () => {
+      const res = await request(app).post(layoutUrl(missingId)).send(seatLayoutInput);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({
+        error: { code: 'SCREEN_NOT_FOUND', message: 'Screen does not exist' },
+      });
+    });
+
+    it('returns 409 on a second call and creates nothing more', async () => {
+      await request(app).post(layoutUrl(screenId)).send(seatLayoutInput);
+
+      const res = await request(app).post(layoutUrl(screenId)).send(seatLayoutInput);
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: {
+          code: 'SEAT_CONFLICT',
+          message: 'Some seats in this layout already exist on this screen',
+        },
+      });
+      await expect(seatCount(screenId)).resolves.toBe(5);
+    });
+
+    // One INSERT: one overlapping seat rolls back the rows that didn't overlap.
+    it('creates no seats when only one seat overlaps', async () => {
+      await createSeat(screenId, { rowLabel: 'B', seatNumber: 3 });
+
+      const res = await request(app).post(layoutUrl(screenId)).send(seatLayoutInput);
+
+      expect(res.status).toBe(409);
+      await expect(seatCount(screenId)).resolves.toBe(1);
+    });
+
+    it('adds rows that do not overlap the existing seats', async () => {
+      await createSeat(screenId, { rowLabel: 'Z', seatNumber: 1 });
+
+      const res = await request(app).post(layoutUrl(screenId)).send(seatLayoutInput);
+
+      expect(res.status).toBe(201);
+      await expect(seatCount(screenId)).resolves.toBe(6);
+    });
+
+    it('creates the largest allowed layout: 26 rows (A to Z) of 100 seats', async () => {
+      const rows = Array.from({ length: 26 }, (_, index) => ({
+        rowLabel: String.fromCharCode(65 + index),
+        seatCount: 100,
+        category: 'standard',
+      }));
+
+      const res = await request(app).post(layoutUrl(screenId)).send({ rows });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ data: { screenId, createdCount: 2600 } });
+      await expect(seatCount(screenId)).resolves.toBe(2600);
     });
   });
 });
