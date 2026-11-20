@@ -20,11 +20,11 @@ const UNIQUE_MESSAGES: Record<string, string> = {
 // Value is the parent entity. Only valid while the FK gets its id from the path alone.
 const PATH_PARENT_FKS: Record<string, string> = {
   screens_venue_id_fkey: 'Venue',
+  seats_screen_id_fkey: 'Screen',
 };
 
 // 23503 foreign_key_violation on create or update, referenced id from the body -> 400
 const FOREIGN_KEY_FIELDS: Record<string, FieldError> = {
-  seats_screen_id_fkey: { field: 'screenId', message: 'Screen does not exist' },
   seats_category_fkey: { field: 'category', message: 'Unknown seat category' },
   events_category_fkey: { field: 'category', message: 'Unknown event category' },
   shows_event_id_fkey: { field: 'eventId', message: 'Event does not exist' },
@@ -45,6 +45,7 @@ const CHECK_FIELDS: Record<string, FieldError> = {
   venues_address_length_check: { field: 'address', message: 'Must be 1 to 500 characters' },
   screens_name_length_check: { field: 'name', message: 'Must be 1 to 100 characters' },
   seats_row_label_not_empty_check: { field: 'rowLabel', message: 'Must not be empty' },
+  seats_row_label_uppercase_check: { field: 'rowLabel', message: 'Must be uppercase' },
   seats_seat_number_range_check: { field: 'seatNumber', message: 'Must be 1 to 100' },
   events_title_length_check: { field: 'title', message: 'Must be 1 to 100 characters' },
   events_description_length_check: {

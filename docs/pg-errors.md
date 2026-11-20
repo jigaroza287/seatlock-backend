@@ -50,7 +50,6 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 
 | Constraint             | Field      | Message                |
 | ---------------------- | ---------- | ---------------------- |
-| `seats_screen_id_fkey` | `screenId` | Screen does not exist  |
 | `seats_category_fkey`  | `category` | Unknown seat category  |
 | `events_category_fkey` | `category` | Unknown event category |
 | `shows_event_id_fkey`  | `eventId`  | Event does not exist   |
@@ -60,9 +59,10 @@ Put the field in `details`, e.g. `[{ field: "eventId", message: "Event does not 
 
 ### 23503 foreign_key_violation (insert or update, parent id from the path) → 404
 
-| Constraint              | Path param | API code          | Message              |
-| ----------------------- | ---------- | ----------------- | -------------------- |
-| `screens_venue_id_fkey` | `venueId`  | `VENUE_NOT_FOUND` | Venue does not exist |
+| Constraint              | Path param | API code           | Message               |
+| ----------------------- | ---------- | ------------------ | --------------------- |
+| `screens_venue_id_fkey` | `venueId`  | `VENUE_NOT_FOUND`  | Venue does not exist  |
+| `seats_screen_id_fkey`  | `screenId` | `SCREEN_NOT_FOUND` | Screen does not exist |
 
 These FKs only ever receive an id from the path, so the constraint name is enough to return 404. If one ever gets ids from both the path and a body, revisit this mapping.
 
@@ -86,6 +86,7 @@ These FKs only ever receive an id from the path, so the constraint name is enoug
 | `venues_address_length_check`                   | Trimmed address 1 to 500 chars       | `address`      |
 | `screens_name_length_check`                     | Trimmed name 1 to 100 chars          | `name`         |
 | `seats_row_label_not_empty_check`               | Trimmed row label not empty          | `rowLabel`     |
+| `seats_row_label_uppercase_check`               | `row_label = upper(row_label)`       | `rowLabel`     |
 | `seats_seat_number_range_check`                 | `seat_number` 1 to 100               | `seatNumber`   |
 | `events_title_length_check`                     | Trimmed title 1 to 100 chars         | `title`        |
 | `events_description_length_check`               | Trimmed description 20 to 2000 chars | `description`  |
