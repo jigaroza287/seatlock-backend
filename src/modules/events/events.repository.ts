@@ -1,7 +1,7 @@
 import { prisma } from '../../db/prisma.js';
 import { type PrismaClient, type Event as EventRow } from '../../generated/prisma/client.js';
 import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
-import { CategorySchema } from './events.schema.js';
+import { eventCategorySchema } from './events.schema.js';
 import type {
   CreateEventInput,
   Event,
@@ -16,7 +16,7 @@ function toEvent(row: EventRow): Event {
     id: row.id,
     title: row.title,
     description: row.description,
-    category: CategorySchema.parse(row.category),
+    category: eventCategorySchema.parse(row.category),
     durationMins: row.durationMins,
     language: row.language,
   };
