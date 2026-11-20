@@ -4,6 +4,7 @@ import { addRequestId } from './middleware/request-id.middleware.js';
 import { router as eventRouter } from './modules/events/events.routes.js';
 import { router as screenRouter } from './modules/screens/screens.routes.js';
 import { router as seatRouter } from './modules/seats/seats.routes.js';
+import { router as showRouter } from './modules/shows/shows.routes.js';
 import { router as venueRouter } from './modules/venues/venues.routes.js';
 import { AppError } from './shared/app-error.js';
 
@@ -14,6 +15,7 @@ app.use('/api/events', eventRouter);
 app.use('/api/venues', venueRouter);
 app.use('/api', screenRouter);
 app.use('/api', seatRouter);
+app.use('/api/shows', showRouter);
 
 app.use((req, _res) => {
   throw AppError.notFound(

@@ -16,6 +16,7 @@ Source of truth for the HTTP API. Field rules follow `prisma/schema.prisma` and 
 - A parent id in the path that does not exist returns 404 (`<PARENT>_NOT_FOUND`). A referenced id in the body that does not exist returns 400 (`VALIDATION_ERROR`) with the field in `details`.
 - Money is an integer in minor units (paise), named `priceMinor`. Never a float.
 - Timestamps are ISO 8601 strings. Requests must include an offset (`Z` or `+05:30`). Responses are in UTC, e.g. `2026-11-20T09:00:00.000Z`.
+- In a query string, encode `+` as `%2B` (e.g. `2026-11-20T00:00:00%2B05:30`). An unencoded `+` decodes to a space and returns 400.
 
 ### List query params
 
@@ -223,35 +224,39 @@ A show is one event playing on one screen at one time.
 
 ### Show endpoints
 
-| Method | Path             | Body                                                                  | Success                                | Error                                                                                                                       |
-| ------ | ---------------- | --------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`                         | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 screen already has a show at this time                              |
-| GET    | `/api/shows`     | None                                                                  | 200 + paginated list                   | 400 invalid query params                                                                                                    |
-| GET    | `/api/shows/:id` | None                                                                  | 200 + show                             | 400 invalid id, 404 not found                                                                                               |
-| PATCH  | `/api/shows/:id` | Any non-empty subset of `{ eventId, screenId, startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id` in body or unknown `eventId` / `screenId`, 404 not found, 409 screen already has a show at this time |
-| DELETE | `/api/shows/:id` | None                                                                  | 204 No Content                         | 400 invalid id, 404 not found                                                                                               |
+| Method | Path             | Body                                               | Success                                | Error                                                                                                              |
+| ------ | ---------------- | -------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 screen already has a show at this time                     |
+| GET    | `/api/shows`     | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                           |
+| GET    | `/api/shows/:id` | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                      |
+| PATCH  | `/api/shows/:id` | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId` or `screenId` in body, 404 not found, 409 screen already has a show at this time |
+| DELETE | `/api/shows/:id` | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                      |
 
 ### Show object
 
 | Field      | Type   | Required on create | Rules                                                                      |
 | ---------- | ------ | ------------------ | -------------------------------------------------------------------------- |
 | id         | string | No (server)        | UUID v7; read-only                                                         |
-| eventId    | string | Yes                | UUID v7 of an existing event                                               |
-| screenId   | string | Yes                | UUID v7 of an existing screen                                              |
+| eventId    | string | Yes                | UUID v7 of an existing event; set on create only                           |
+| screenId   | string | Yes                | UUID v7 of an existing screen; set on create only                          |
 | startsAt   | string | Yes                | ISO 8601 with offset; `(screenId, startsAt)` is unique                     |
 | priceMinor | number | Yes                | Integer in paise, 0 to 2147483647 (Postgres `integer` max); `0` means free |
 
 The database only blocks two shows with the exact same `startsAt` on one screen. It does not block overlapping shows.
 
+To move a show to another event or screen, delete it and create a new one.
+
 ### Show list filters
 
-| Param    | Type   | Description                                         |
-| -------- | ------ | --------------------------------------------------- |
-| eventId  | string | Shows of this event                                 |
-| screenId | string | Shows on this screen                                |
-| from     | string | ISO 8601 with offset; `startsAt >= from`            |
-| to       | string | ISO 8601 with offset; `startsAt < to`; after `from` |
+| Param    | Type   | Description                                                             |
+| -------- | ------ | ----------------------------------------------------------------------- |
+| eventId  | string | UUID; shows of this event. An id with no shows returns an empty list    |
+| screenId | string | UUID; shows on this screen. An id with no shows returns an empty list   |
+| from     | string | ISO 8601 with offset; `startsAt >= from`                                |
+| to       | string | ISO 8601 with offset; `startsAt < to`; when both are sent, after `from` |
 
-`from` and `to` form a half-open range. For "shows on a day", the client sends local midnight to the next local midnight with its offset, e.g. `from=2026-11-20T00:00:00+05:30&to=2026-11-21T00:00:00+05:30`.
+`from` and `to` can be sent alone or together. Both are compared as instants, so they can use different offsets. `to` not after `from` returns 400 with `to` in `details`.
 
-Sorted by `startsAt` ascending.
+`from` and `to` form a half-open range. For "shows on a day", the client sends local midnight to the next local midnight with its offset, e.g. `from=2026-11-20T00:00:00%2B05:30&to=2026-11-21T00:00:00%2B05:30` (`+` encoded as `%2B`).
+
+Sorted by `startsAt` ascending, then `id` ascending so shows at the same time page in a stable order.
