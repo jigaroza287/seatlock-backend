@@ -56,7 +56,6 @@ src/
 prisma/                schema.prisma, migrations/
 sql/                   schema.sql (original DDL), seed.sql, queries.sql (practice)
 docs/                  api-contract.md, pg-errors.md
-requests.http          manual API checks
 ```
 
 ## Layer rules
@@ -94,7 +93,6 @@ requests.http          manual API checks
 
 - Vitest. Route tests use Supertest against `app` with the mock repository, no database.
 - Integration tests run against a separate test database. Never point tests at the dev database.
-- Keep `requests.http` in sync when routes or status codes change.
 
 ## Project rules
 

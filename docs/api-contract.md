@@ -182,13 +182,13 @@ A seat belongs to one screen. Create and list are nested under the screen; singl
 
 ### Seat object
 
-| Field      | Type   | Required on create | Rules                                                                                                |
-| ---------- | ------ | ------------------ | ---------------------------------------------------------------------------------------------------- |
-| id         | string | No (server)        | UUID v7; read-only                                                                                   |
-| screenId   | string | No (from path)     | UUID v7; read-only                                                                                   |
-| rowLabel   | string | Yes                | 1 to 10 characters, stored uppercase; `(screenId, rowLabel, seatNumber)` is unique, case-insensitive |
-| seatNumber | number | Yes                | Integer, 1 to 100                                                                                    |
-| category   | string | Yes                | One of [`SeatCategory`](#lookup-values)                                                              |
+| Field      | Type   | Required on create | Rules                                                                                                   |
+| ---------- | ------ | ------------------ | ------------------------------------------------------------------------------------------------------- |
+| id         | string | No (server)        | UUID v7; read-only                                                                                      |
+| screenId   | string | No (from path)     | UUID v7; read-only                                                                                      |
+| rowLabel   | string | Yes                | 1 letter (`A` to `Z`), case-insensitive, stored uppercase; `(screenId, rowLabel, seatNumber)` is unique |
+| seatNumber | number | Yes                | Integer, 1 to 100                                                                                       |
+| category   | string | Yes                | One of [`SeatCategory`](#lookup-values)                                                                 |
 
 ### Seat list filters
 
@@ -197,6 +197,25 @@ A seat belongs to one screen. Create and list are nested under the screen; singl
 | category | string | Filter by one of the `SeatCategory` codes |
 
 Sorted by `rowLabel` ascending, then `seatNumber` ascending.
+
+### Seat layout
+
+Creates many seats on a screen in one request. Each row gets seats numbered from 1 to `seatCount`.
+
+| Method | Path                                  | Body       | Success                                      | Error                                                                                 |
+| ------ | ------------------------------------- | ---------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| POST   | `/api/screens/:screenId/seats/layout` | `{ rows }` | 201 + `{ data: { screenId, createdCount } }` | 400 invalid body or id, 404 screen not found, 409 a seat in the layout already exists |
+
+- No `Location` header: the response holds a count, not a resource. List the seats with `GET /api/screens/:screenId/seats`.
+- All or nothing: if any seat already exists on the screen, the request returns 409 and creates no seats.
+- Rows that don't overlap existing seats are added. A screen with row `Z` accepts a layout for rows `A` to `C`.
+
+| Field            | Type   | Rules                                                                     |
+| ---------------- | ------ | ------------------------------------------------------------------------- |
+| rows             | array  | 1 to 26 rows; row labels must be unique within the request                |
+| rows[].rowLabel  | string | 1 letter (`A` to `Z`), case-insensitive, stored uppercase                 |
+| rows[].seatCount | number | Integer, 1 to 100                                                         |
+| rows[].category  | string | One of [`SeatCategory`](#lookup-values); applies to every seat in the row |
 
 ## Show
 

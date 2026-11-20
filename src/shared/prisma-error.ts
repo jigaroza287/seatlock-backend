@@ -160,3 +160,8 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
 export function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
+
+// P2002: 23505 unique_violation. For callers that need a message other than UNIQUE_MESSAGES.
+export function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}

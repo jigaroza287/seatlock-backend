@@ -5,7 +5,7 @@ import { AppError } from '../../../shared/app-error.js';
 import { screen } from '../../screens/__tests__/screens.fixtures.js';
 import type { IScreenRepository } from '../../screens/screens.type.js';
 import type { ISeatRepository } from '../seats.type.js';
-import { seat, seatInput } from './seats.fixtures.js';
+import { seat, seatInput, seatLayoutInput } from './seats.fixtures.js';
 
 // Replace the Prisma repositories so routes, controller, service and middleware run without a database.
 // vi.hoisted lets the vi.mock factories, which run before imports, use these mocks.
@@ -14,6 +14,7 @@ const { repository, screenRepository } = vi.hoisted(() => ({
     findMany: vi.fn<ISeatRepository['findMany']>(),
     findById: vi.fn<ISeatRepository['findById']>(),
     create: vi.fn<ISeatRepository['create']>(),
+    createMany: vi.fn<ISeatRepository['createMany']>(),
     update: vi.fn<ISeatRepository['update']>(),
     delete: vi.fn<ISeatRepository['delete']>(),
   },
@@ -33,6 +34,7 @@ vi.mock('../../../db/prisma.js', () => ({ prisma: {} }));
 
 const screenSeatsUrl = `/api/screens/${screen.id}/seats`;
 const seatUrl = `/api/seats/${seat.id}`;
+const layoutUrl = `/api/screens/${screen.id}/seats/layout`;
 
 const conflict = AppError.conflict('Seat', 'This seat already exists on this screen');
 
@@ -118,10 +120,7 @@ describe('seats routes', () => {
     it.each([
       { reason: 'the body is empty', body: {} },
       { reason: 'the row label is blank', body: { ...seatInput, rowLabel: '   ' } },
-      {
-        reason: 'the row label is longer than 10 characters',
-        body: { ...seatInput, rowLabel: 'A'.repeat(11) },
-      },
+      { reason: 'the row label has two letters', body: { ...seatInput, rowLabel: 'AA' } },
       { reason: 'the seat number is 0', body: { ...seatInput, seatNumber: 0 } },
       { reason: 'the seat number is above 100', body: { ...seatInput, seatNumber: 101 } },
       { reason: 'the category is unknown', body: { ...seatInput, category: 'vip' } },
@@ -168,6 +167,80 @@ describe('seats routes', () => {
       expect(repository.create).not.toHaveBeenCalled();
     }
   );
+
+  describe('POST /api/screens/:screenId/seats/layout', () => {
+    const row = { rowLabel: 'A', seatCount: 10, category: 'standard' };
+
+    it('returns 201 with the screen id and created count, and no Location header', async () => {
+      repository.createMany.mockResolvedValue(5);
+
+      const res = await request(app).post(layoutUrl).send(seatLayoutInput);
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ data: { screenId: screen.id, createdCount: 5 } });
+      expect(res.headers['location']).toBeUndefined();
+      expect(repository.createMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes uppercased row labels to the repository', async () => {
+      repository.createMany.mockResolvedValue(1);
+
+      await request(app)
+        .post(layoutUrl)
+        .send({ rows: [{ ...row, rowLabel: ' b ', seatCount: 1 }] });
+
+      expect(repository.createMany).toHaveBeenCalledWith([
+        { screenId: screen.id, rowLabel: 'B', seatNumber: 1, category: 'standard' },
+      ]);
+    });
+
+    it.each([
+      { reason: 'the body is empty', body: {} },
+      { reason: 'rows is empty', body: { rows: [] } },
+      { reason: 'the row label has two letters', body: { rows: [{ ...row, rowLabel: 'AA' }] } },
+      { reason: 'the seat count is not an integer', body: { rows: [{ ...row, seatCount: 2.5 }] } },
+      { reason: 'the seat count is above 100', body: { rows: [{ ...row, seatCount: 101 }] } },
+      { reason: 'the category is unknown', body: { rows: [{ ...row, category: 'vip' }] } },
+      { reason: 'a row label repeats', body: { rows: [row, { ...row, rowLabel: 'a' }] } },
+      { reason: 'the body has screenId', body: { ...seatLayoutInput, screenId: screen.id } },
+    ])('returns 400 when $reason', async ({ body }) => {
+      const res = await request(app).post(layoutUrl).send(body);
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(repository.createMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when the screen id is not a UUID', async () => {
+      const res = await request(app)
+        .post('/api/screens/not-a-uuid/seats/layout')
+        .send(seatLayoutInput);
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(repository.createMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the screen does not exist', async () => {
+      repository.createMany.mockRejectedValue(AppError.notFound('Screen', 'Screen does not exist'));
+
+      const res = await request(app).post(layoutUrl).send(seatLayoutInput);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: { code: 'SCREEN_NOT_FOUND' } });
+    });
+
+    it('returns 409 when a seat in the layout already exists', async () => {
+      repository.createMany.mockRejectedValue(
+        AppError.conflict('Seat', 'Some seats in this layout already exist on this screen')
+      );
+
+      const res = await request(app).post(layoutUrl).send(seatLayoutInput);
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ error: { code: 'SEAT_CONFLICT' } });
+    });
+  });
 
   describe('GET /api/seats/:id', () => {
     it('returns 200 with the seat', async () => {

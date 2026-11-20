@@ -1,9 +1,11 @@
 import { AppError } from '../../shared/app-error.js';
 import { screenRepository } from '../screens/screens.repository.js';
 import type { IScreenRepository } from '../screens/screens.type.js';
+import { expandLayout } from './seats.layout.js';
 import { seatRepository } from './seats.repository.js';
 import type {
   CreateSeatInput,
+  CreateSeatLayoutInput,
   ISeatRepository,
   ListSeatsQuery,
   Seat,
@@ -63,6 +65,11 @@ export class SeatService {
     if (!deleted) {
       throw notFound(id);
     }
+  }
+
+  async generateLayout(screenId: string, input: CreateSeatLayoutInput): Promise<number> {
+    const newSeats = expandLayout(screenId, input.rows);
+    return this.repository.createMany(newSeats);
   }
 }
 

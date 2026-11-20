@@ -83,7 +83,6 @@ Integration tests apply migrations and truncate data tables before each test. Th
 
 Routes, request bodies, status codes and the error shape: [`docs/api-contract.md`](docs/api-contract.md).
 Database error to HTTP mapping: [`docs/pg-errors.md`](docs/pg-errors.md).
-Manual checks: `requests.http`.
 
 ## Project layout
 

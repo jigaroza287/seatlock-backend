@@ -4,7 +4,7 @@ import { screen } from '../../screens/__tests__/screens.fixtures.js';
 import type { IScreenRepository } from '../../screens/screens.type.js';
 import { SeatService } from '../seats.service.js';
 import type { ISeatRepository, ListSeatsQuery } from '../seats.type.js';
-import { seat, seatInput } from './seats.fixtures.js';
+import { seat, seatInput, seatLayoutInput } from './seats.fixtures.js';
 
 // seats.service.ts creates the real singleton on import, which loads Prisma and needs DATABASE_URL.
 vi.mock('../seats.repository.js', () => ({ seatRepository: {} }));
@@ -17,11 +17,19 @@ describe('SeatService', () => {
   const findMany = vi.fn<ISeatRepository['findMany']>();
   const findById = vi.fn<ISeatRepository['findById']>();
   const create = vi.fn<ISeatRepository['create']>();
+  const createMany = vi.fn<ISeatRepository['createMany']>();
   const update = vi.fn<ISeatRepository['update']>();
   const remove = vi.fn<ISeatRepository['delete']>();
   const findScreenById = vi.fn<IScreenRepository['findById']>();
 
-  const repository: ISeatRepository = { findMany, findById, create, update, delete: remove };
+  const repository: ISeatRepository = {
+    findMany,
+    findById,
+    create,
+    createMany,
+    update,
+    delete: remove,
+  };
   // Only findById is used by the seat service.
   const screenRepository: IScreenRepository = {
     findMany: vi.fn<IScreenRepository['findMany']>(),
@@ -124,6 +132,44 @@ describe('SeatService', () => {
       remove.mockResolvedValue(false);
 
       await expect(service.remove(seat.id)).rejects.toMatchObject(notFound);
+    });
+  });
+
+  describe('generateLayout', () => {
+    it('expands the rows into seats and returns the created count', async () => {
+      createMany.mockResolvedValue(5);
+
+      await expect(service.generateLayout(screen.id, seatLayoutInput)).resolves.toBe(5);
+      expect(createMany).toHaveBeenCalledWith([
+        { screenId: screen.id, rowLabel: 'A', seatNumber: 1, category: 'standard' },
+        { screenId: screen.id, rowLabel: 'A', seatNumber: 2, category: 'standard' },
+        { screenId: screen.id, rowLabel: 'B', seatNumber: 1, category: 'premium' },
+        { screenId: screen.id, rowLabel: 'B', seatNumber: 2, category: 'premium' },
+        { screenId: screen.id, rowLabel: 'B', seatNumber: 3, category: 'premium' },
+      ]);
+    });
+
+    it('does not look up the screen first', async () => {
+      createMany.mockResolvedValue(5);
+
+      await service.generateLayout(screen.id, seatLayoutInput);
+
+      expect(findScreenById).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        reason: 'SCREEN_NOT_FOUND',
+        error: AppError.notFound('Screen', 'Screen does not exist'),
+      },
+      {
+        reason: 'SEAT_CONFLICT',
+        error: AppError.conflict('Seat', 'Some seats in this layout already exist on this screen'),
+      },
+    ])('passes $reason from the repository through unchanged', async ({ error }) => {
+      createMany.mockRejectedValue(error);
+
+      await expect(service.generateLayout(screen.id, seatLayoutInput)).rejects.toBe(error);
     });
   });
 });
