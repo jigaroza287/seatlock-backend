@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { idParamSchema, listQuerySchema, venueIdParamSchema } from '../schema.js';
+import {
+  idParamSchema,
+  listQuerySchema,
+  screenIdParamSchema,
+  venueIdParamSchema,
+} from '../schema.js';
 
 describe('listQuerySchema', () => {
   it('uses default pagination values', () => {
@@ -63,5 +68,21 @@ describe('venueIdParamSchema', () => {
 
   it('rejects a missing venueId', () => {
     expect(venueIdParamSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('screenIdParamSchema', () => {
+  it('accepts a valid UUID', () => {
+    expect(
+      screenIdParamSchema.safeParse({ screenId: '550e8400-e29b-41d4-a716-446655440000' }).success
+    ).toBe(true);
+  });
+
+  it.each(['not-a-uuid', ''])('rejects an invalid screenId: "%s"', (screenId) => {
+    expect(screenIdParamSchema.safeParse({ screenId }).success).toBe(false);
+  });
+
+  it('rejects a missing screenId', () => {
+    expect(screenIdParamSchema.safeParse({}).success).toBe(false);
   });
 });
