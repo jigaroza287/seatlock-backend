@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { listQuerySchema } from '../../shared/schema.js';
 
-export const CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as const;
-export const CategorySchema = z.enum(CATEGORIES);
+export const EVENT_CATEGORIES = ['concert', 'comedy', 'theatre', 'sports', 'movie'] as const;
+export const eventCategorySchema = z.enum(EVENT_CATEGORIES);
 
 export const createEventSchema = z
   .object({
     title: z.string().trim().min(1).max(100),
     description: z.string().trim().min(20).max(2000),
-    category: CategorySchema,
+    category: eventCategorySchema,
     durationMins: z.number().int().positive().max(1440),
     language: z
       .string()
@@ -24,5 +24,5 @@ export const updateEventSchema = createEventSchema
 
 export const listEventQuerySchema = listQuerySchema.extend({
   search: z.string().trim().min(1).max(100).optional(),
-  category: CategorySchema.optional(),
+  category: eventCategorySchema.optional(),
 });

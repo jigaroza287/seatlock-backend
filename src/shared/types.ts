@@ -1,5 +1,5 @@
 import type z from 'zod';
-import type { idParamSchema, venueIdParamSchema } from './schema.js';
+import type { idParamSchema, screenIdParamSchema, venueIdParamSchema } from './schema.js';
 
 export type CommonError = {
   code: string;
@@ -15,3 +15,5 @@ export type CommonErrorResponse = {
 export type IdParam = z.infer<typeof idParamSchema>;
 
 export type VenueIdParam = z.infer<typeof venueIdParamSchema>;
+
+export type ScreenIdParam = z.infer<typeof screenIdParamSchema>;

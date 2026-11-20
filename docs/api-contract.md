@@ -182,13 +182,13 @@ A seat belongs to one screen. Create and list are nested under the screen; singl
 
 ### Seat object
 
-| Field      | Type   | Required on create | Rules                                                   |
-| ---------- | ------ | ------------------ | ------------------------------------------------------- |
-| id         | string | No (server)        | UUID v7; read-only                                      |
-| screenId   | string | No (from path)     | UUID v7; read-only                                      |
-| rowLabel   | string | Yes                | Non-empty; `(screenId, rowLabel, seatNumber)` is unique |
-| seatNumber | number | Yes                | Integer, 1 to 100                                       |
-| category   | string | Yes                | One of [`SeatCategory`](#lookup-values)                 |
+| Field      | Type   | Required on create | Rules                                                                                                |
+| ---------- | ------ | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| id         | string | No (server)        | UUID v7; read-only                                                                                   |
+| screenId   | string | No (from path)     | UUID v7; read-only                                                                                   |
+| rowLabel   | string | Yes                | 1 to 10 characters, stored uppercase; `(screenId, rowLabel, seatNumber)` is unique, case-insensitive |
+| seatNumber | number | Yes                | Integer, 1 to 100                                                                                    |
+| category   | string | Yes                | One of [`SeatCategory`](#lookup-values)                                                              |
 
 ### Seat list filters
 

@@ -1,16 +1,24 @@
 import { z } from 'zod';
 import type {
-  CategorySchema,
+  eventCategorySchema,
   createEventSchema,
   listEventQuerySchema,
   updateEventSchema,
 } from './events.schema.js';
 
-export type CategoryType = z.infer<typeof CategorySchema>;
-
+export type EventCategory = z.infer<typeof eventCategorySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
-export type Event = CreateEventInput & { id: string };
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
+export type ListEventsQuery = z.infer<typeof listEventQuerySchema>;
+
+export type Event = {
+  id: string;
+  title: string;
+  description: string;
+  category: EventCategory;
+  durationMins: number;
+  language: string;
+};
 
 export type EventListOutput = { items: Event[]; total: number };
 
@@ -21,5 +29,3 @@ export interface IEventRepository {
   update(id: string, changes: UpdateEventInput): Promise<Event | null>;
   delete(id: string): Promise<boolean>;
 }
-
-export type ListEventsQuery = z.infer<typeof listEventQuerySchema>;

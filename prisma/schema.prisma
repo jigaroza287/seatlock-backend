@@ -41,7 +41,7 @@ model Screen {
   seats     Seat[]
   shows     Show[]
 
-// Case-insensitive unique (venue_id, lower(name)) lives in migration 20261119141117; Prisma can't express it.
+  // Case-insensitive unique (venue_id, lower(name)) lives in migration 20261119141117; Prisma can't express it.
   @@map("screens")
 }
 
