@@ -153,6 +153,55 @@ describe('toAppError', () => {
     });
   });
 
+  describe('23P01 exclusion violation', () => {
+    // The adapter gives no constraint field for 23P01, so the name comes from the message.
+    const overlapMessage = 'conflicting key value violates exclusion constraint "shows_no_overlap"';
+
+    it('returns 409 with the message for a known constraint from the query API (P2039)', () => {
+      const error = prismaError('P2039', { originalCode: '23P01', message: overlapMessage });
+
+      expect(toAppError(error, 'Show', 'create')).toMatchObject({
+        statusCode: 409,
+        code: 'SHOW_CONFLICT',
+        message: 'Shows on this screen would overlap',
+      });
+      // An overlap is a business conflict, not a Zod gap.
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 with a fallback message for an unknown constraint', () => {
+      const error = prismaError('P2039', {
+        originalCode: '23P01',
+        message: 'conflicting key value violates exclusion constraint "unknown_excl"',
+      });
+
+      expect(toAppError(error, 'Show', 'update')).toMatchObject({
+        statusCode: 409,
+        code: 'SHOW_CONFLICT',
+        message: 'Show conflicts with an existing row',
+      });
+    });
+
+    it('returns 409 for the given entity when raw SQL hits it (P2010)', () => {
+      const error = prismaError('P2010', { originalCode: '23P01', message: overlapMessage });
+
+      expect(toAppError(error, 'Event', 'update')).toMatchObject({
+        statusCode: 409,
+        code: 'EVENT_CONFLICT',
+        message: 'Shows on this screen would overlap',
+      });
+    });
+
+    it('returns other raw SQL errors unchanged', () => {
+      const error = prismaError('P2010', {
+        originalCode: '23505',
+        constraint: { index: 'events_title_lower_key' },
+      });
+
+      expect(toAppError(error, 'Event', 'update')).toBe(error);
+    });
+  });
+
   describe('errors that Zod should have caught', () => {
     it.each([
       { code: 'P2011', sqlState: '23502' },

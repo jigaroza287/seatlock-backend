@@ -57,6 +57,12 @@ const CHECK_FIELDS: Record<string, FieldError> = {
   shows_price_minor_non_negative_check: { field: 'priceMinor', message: 'Must not be negative' },
 };
 
+// 23P01 exclusion_violation -> 409
+// Hit by show create and update, and by an event update that changes durationMins.
+const EXCLUSION_MESSAGES: Record<string, string> = {
+  shows_no_overlap: 'Shows on this screen would overlap',
+};
+
 type DbErrorInfo = {
   sqlState?: string;
   constraint?: string;
@@ -89,6 +95,11 @@ function readDbError(err: Prisma.PrismaClientKnownRequestError): DbErrorInfo {
 
 function validationError(details?: FieldError[]): AppError {
   return new AppError(400, 'VALIDATION_ERROR', 'Invalid request', details);
+}
+
+function exclusionConflict(entity: string, constraint: string): AppError {
+  const message = EXCLUSION_MESSAGES[constraint] ?? `${entity} conflicts with an existing row`;
+  return AppError.conflict(entity, message);
 }
 
 // 23514, 23502 and 22P02 mean Zod let bad input through.
@@ -138,8 +149,17 @@ export function toAppError(err: unknown, entity: string, operation: Operation): 
       return validationError();
     }
 
+    // Raw SQL ($queryRaw, $executeRaw): Prisma wraps every database error in P2010.
+    // Only the exclusion constraint is expected here; anything else stays a 500.
+    case 'P2010': {
+      return info.sqlState === '23P01' ? exclusionConflict(entity, constraint) : err;
+    }
+
     // Postgres errors without a Prisma code, e.g. 23514 check_violation
     case 'P2039': {
+      if (info.sqlState === '23P01') {
+        return exclusionConflict(entity, constraint);
+      }
       warnZodGap(entity, info);
       if (info.sqlState !== '23514') {
         return validationError();

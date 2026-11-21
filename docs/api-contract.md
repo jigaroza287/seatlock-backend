@@ -55,13 +55,13 @@ Every list endpoint accepts these, plus its own filters.
 
 ### Error codes
 
-| HTTP | Code                    | When                                                                  |
-| ---- | ----------------------- | --------------------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`      | Invalid body, query, path id or malformed JSON; missing referenced id |
-| 404  | `<ENTITY>_NOT_FOUND`    | Resource or parent resource does not exist                            |
-| 404  | `ROUTE_NOT_FOUND`       | No route matches the method and path                                  |
-| 409  | `<ENTITY>_CONFLICT`     | Unique constraint hit, or delete blocked by dependent rows            |
-| 500  | `INTERNAL_SERVER_ERROR` | Unexpected error                                                      |
+| HTTP | Code                    | When                                                                            |
+| ---- | ----------------------- | ------------------------------------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`      | Invalid body, query, path id or malformed JSON; missing referenced id           |
+| 404  | `<ENTITY>_NOT_FOUND`    | Resource or parent resource does not exist                                      |
+| 404  | `ROUTE_NOT_FOUND`       | No route matches the method and path                                            |
+| 409  | `<ENTITY>_CONFLICT`     | Unique constraint hit, shows would overlap, or delete blocked by dependent rows |
+| 500  | `INTERNAL_SERVER_ERROR` | Unexpected error                                                                |
 
 `<ENTITY>` is one of `EVENT`, `VENUE`, `SCREEN`, `SEAT`, `SHOW`.
 
@@ -81,13 +81,13 @@ type SeatCategory = 'standard' | 'premium' | 'recliner';
 
 ### Event endpoints
 
-| Method | Path              | Body                                                                               | Success                                 | Error                                                                   |
-| ------ | ----------------- | ---------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| POST   | `/api/events`     | `{ title, description, category, durationMins, language }`                         | 201 + created event + `Location` header | 400 invalid body, 409 title already used                                |
-| GET    | `/api/events`     | None                                                                               | 200 + paginated list                    | 400 invalid query params                                                |
-| GET    | `/api/events/:id` | None                                                                               | 200 + event                             | 400 invalid id, 404 not found                                           |
-| PATCH  | `/api/events/:id` | Any non-empty subset of `{ title, description, category, durationMins, language }` | 200 + updated event                     | 400 invalid body or `id` in body, 404 not found, 409 title already used |
-| DELETE | `/api/events/:id` | None                                                                               | 204 No Content                          | 400 invalid id, 404 not found, 409 event has shows                      |
+| Method | Path              | Body                                                                               | Success                                 | Error                                                                                                             |
+| ------ | ----------------- | ---------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/events`     | `{ title, description, category, durationMins, language }`                         | 201 + created event + `Location` header | 400 invalid body, 409 title already used                                                                          |
+| GET    | `/api/events`     | None                                                                               | 200 + paginated list                    | 400 invalid query params                                                                                          |
+| GET    | `/api/events/:id` | None                                                                               | 200 + event                             | 400 invalid id, 404 not found                                                                                     |
+| PATCH  | `/api/events/:id` | Any non-empty subset of `{ title, description, category, durationMins, language }` | 200 + updated event                     | 400 invalid body or `id` in body, 404 not found, 409 title already used or new `durationMins` makes shows overlap |
+| DELETE | `/api/events/:id` | None                                                                               | 204 No Content                          | 400 invalid id, 404 not found, 409 event has shows                                                                |
 
 ### Event object
 
@@ -108,6 +108,8 @@ type SeatCategory = 'standard' | 'premium' | 'recliner';
 | category | string | Filter by one of the `EventCategory` codes |
 
 Sorted by `title` ascending.
+
+Changing `durationMins` moves `endsAt` of every show of the event. If that makes two shows on a screen overlap, the request returns 409 `EVENT_CONFLICT` and nothing changes.
 
 ## Venue
 
@@ -224,13 +226,13 @@ A show is one event playing on one screen at one time.
 
 ### Show endpoints
 
-| Method | Path             | Body                                               | Success                                | Error                                                                                                              |
-| ------ | ---------------- | -------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 screen already has a show at this time                     |
-| GET    | `/api/shows`     | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                           |
-| GET    | `/api/shows/:id` | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                      |
-| PATCH  | `/api/shows/:id` | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId` or `screenId` in body, 404 not found, 409 screen already has a show at this time |
-| DELETE | `/api/shows/:id` | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                      |
+| Method | Path             | Body                                               | Success                                | Error                                                                                                                      |
+| ------ | ---------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen                               |
+| GET    | `/api/shows`     | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                                   |
+| GET    | `/api/shows/:id` | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                              |
+| PATCH  | `/api/shows/:id` | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
+| DELETE | `/api/shows/:id` | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                              |
 
 ### Show object
 
@@ -239,10 +241,13 @@ A show is one event playing on one screen at one time.
 | id         | string | No (server)        | UUID v7; read-only                                                         |
 | eventId    | string | Yes                | UUID v7 of an existing event; set on create only                           |
 | screenId   | string | Yes                | UUID v7 of an existing screen; set on create only                          |
-| startsAt   | string | Yes                | ISO 8601 with offset; `(screenId, startsAt)` is unique                     |
+| startsAt   | string | Yes                | ISO 8601 with offset; returned in UTC                                      |
+| endsAt     | string | No (server)        | ISO 8601 in UTC; `startsAt` + the event's `durationMins`; read-only        |
 | priceMinor | number | Yes                | Integer in paise, 0 to 2147483647 (Postgres `integer` max); `0` means free |
 
-The database only blocks two shows with the exact same `startsAt` on one screen. It does not block overlapping shows.
+Shows on one screen can't overlap. The database enforces this on `[startsAt, endsAt)`, a half-open range, so a show may start at the exact time the previous one ends. An overlap returns 409 `SHOW_CONFLICT`.
+
+`endsAt` follows `startsAt` on PATCH and the event's `durationMins` when the event changes. Sending `endsAt` returns 400.
 
 To move a show to another event or screen, delete it and create a new one.
 
