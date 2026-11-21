@@ -13,4 +13,5 @@ export const showInput: Readonly<CreateShowInput> = Object.freeze({
 export const show: Readonly<Show> = Object.freeze({
   id: '019a0000-0000-7000-8000-000000000001',
   ...showInput,
+  endsAt: '2026-12-01T17:00:00.000Z',
 });

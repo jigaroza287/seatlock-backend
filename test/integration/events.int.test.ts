@@ -4,6 +4,7 @@ import { app } from '../../src/app.js';
 import { prisma } from '../../src/db/prisma.js';
 import { eventInput } from '../../src/modules/events/__tests__/events.fixtures.js';
 import type { CreateEventInput, Event } from '../../src/modules/events/events.type.js';
+import type { Show } from '../../src/modules/shows/shows.type.js';
 
 // Real app, real database. Covers what the mocked route tests can't: constraints, queries, persistence.
 
@@ -20,6 +21,28 @@ async function createEvent(overrides: Partial<CreateEventInput> = {}): Promise<E
 
 function titlesOf(body: unknown): string[] {
   return (body as { data: Event[] }).data.map((event) => event.title);
+}
+
+// Parent rows are setup, not under test, so they go straight through Prisma.
+async function createScreenId(): Promise<string> {
+  const venue = await prisma.venue.create({ data: { name: 'Main hall', city: 'Pune' } });
+  const screen = await prisma.screen.create({ data: { name: 'Screen 1', venueId: venue.id } });
+  return screen.id;
+}
+
+// Through the API, so the repository computes endsAt from the event's duration.
+async function createShow(eventId: string, screenId: string, startsAt: string): Promise<Show> {
+  const res = await request(app)
+    .post('/api/shows')
+    .send({ eventId, screenId, startsAt, priceMinor: 50_000 });
+  expect(res.status).toBe(201);
+  return (res.body as { data: Show }).data;
+}
+
+async function fetchShow(id: string): Promise<Show> {
+  const res = await request(app).get(`/api/shows/${id}`);
+  expect(res.status).toBe(200);
+  return (res.body as { data: Show }).data;
 }
 
 describe('events integration', () => {
@@ -120,6 +143,56 @@ describe('events integration', () => {
       expect(res.status).toBe(409);
       expect(res.body).toMatchObject({ error: { code: 'EVENT_CONFLICT' } });
     });
+
+    describe('with shows', () => {
+      let event: Event;
+      let screenId: string;
+
+      // The fixture event runs 90 minutes, so a show at 14:30 ends at 16:00.
+      beforeEach(async () => {
+        event = await createEvent();
+        screenId = await createScreenId();
+      });
+
+      it('moves endsAt of its shows when durationMins changes', async () => {
+        const show = await createShow(event.id, screenId, '2026-12-01T14:30:00Z');
+
+        const res = await request(app).patch(`/api/events/${event.id}`).send({ durationMins: 120 });
+
+        expect(res.status).toBe(200);
+        expect(await fetchShow(show.id)).toEqual({ ...show, endsAt: '2026-12-01T16:30:00.000Z' });
+      });
+
+      it('leaves its shows unchanged when durationMins is not sent', async () => {
+        const show = await createShow(event.id, screenId, '2026-12-01T14:30:00Z');
+
+        const res = await request(app)
+          .patch(`/api/events/${event.id}`)
+          .send({ title: 'Late-night stand-up' });
+
+        expect(res.status).toBe(200);
+        expect(await fetchShow(show.id)).toEqual(show);
+      });
+
+      // The UPDATE of shows fails on shows_no_overlap, so the event update rolls back too.
+      it('returns 409 and changes nothing when a longer duration makes shows overlap', async () => {
+        const show = await createShow(event.id, screenId, '2026-12-01T14:30:00Z');
+        const otherEvent = await createEvent({ title: 'Rock concert' });
+        const nextShow = await createShow(otherEvent.id, screenId, '2026-12-01T16:00:00Z');
+
+        const res = await request(app).patch(`/api/events/${event.id}`).send({ durationMins: 120 });
+
+        expect(res.status).toBe(409);
+        expect(res.body).toMatchObject({
+          error: { code: 'EVENT_CONFLICT', message: 'Shows on this screen would overlap' },
+        });
+
+        const fetched = await request(app).get(`/api/events/${event.id}`);
+        expect(fetched.body).toEqual({ data: event });
+        expect(await fetchShow(show.id)).toEqual(show);
+        expect(await fetchShow(nextShow.id)).toEqual(nextShow);
+      });
+    });
   });
 
   describe('DELETE /api/events/:id', () => {
@@ -145,11 +218,13 @@ describe('events integration', () => {
       const created = await createEvent();
       const venue = await prisma.venue.create({ data: { name: 'Main hall', city: 'Pune' } });
       const screen = await prisma.screen.create({ data: { name: 'Screen 1', venueId: venue.id } });
+      const startsAt = new Date('2026-12-01T14:30:00Z');
       await prisma.show.create({
         data: {
           eventId: created.id,
           screenId: screen.id,
-          startsAt: new Date('2026-12-01T14:30:00Z'),
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + created.durationMins * 60 * 1000),
           priceMinor: 50_000,
         },
       });

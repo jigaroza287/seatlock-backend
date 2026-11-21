@@ -70,9 +70,21 @@ class EventRepository implements IEventRepository {
     }
   }
 
+  // A new durationMins moves endsAt of every show of this event. If that makes two shows on a
+  // screen overlap, shows_no_overlap fails and the whole update rolls back (409).
   async update(id: string, changes: UpdateEventInput): Promise<Event | null> {
     try {
-      const updatedEvent = await this.db.event.update({ where: { id }, data: changes });
+      const updatedEvent = await this.db.$transaction(async (tx) => {
+        const event = await tx.event.update({ where: { id }, data: changes });
+        if (changes.durationMins !== undefined) {
+          await tx.$executeRaw`
+            UPDATE shows
+            SET ends_at = starts_at + make_interval(mins => ${event.durationMins}::int)
+            WHERE event_id = ${id}::uuid
+          `;
+        }
+        return event;
+      });
       return toEvent(updatedEvent);
     } catch (error: unknown) {
       if (isRecordNotFound(error)) {

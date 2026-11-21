@@ -225,6 +225,8 @@ describe('screens integration', () => {
           eventId: event.id,
           screenId: created.id,
           startsAt: new Date('2026-12-01T14:30:00.000Z'),
+          // startsAt + the event's 90 minutes.
+          endsAt: new Date('2026-12-01T16:00:00.000Z'),
           priceMinor: 50000,
         },
       });

@@ -76,6 +76,7 @@ model Show {
   eventId    String   @map("event_id") @db.Uuid
   screenId   String   @map("screen_id") @db.Uuid
   startsAt   DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime @map("ends_at") @db.Timestamptz(6)
   priceMinor Int      @map("price_minor")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   event      Event    @relation(fields: [eventId], references: [id], onUpdate: NoAction)

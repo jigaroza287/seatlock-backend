@@ -196,6 +196,21 @@ describe('events routes', () => {
       expect(res.status).toBe(409);
       expect(res.body).toMatchObject({ error: { code: 'EVENT_CONFLICT' } });
     });
+
+    // What toAppError returns when the shows' new endsAt hits shows_no_overlap.
+    it('returns 409 when a new durationMins makes shows overlap', async () => {
+      repository.update.mockRejectedValue(
+        AppError.conflict('Event', 'Shows on this screen would overlap')
+      );
+
+      const res = await request(app).patch(eventUrl).send({ durationMins: 180 });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'EVENT_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
+      expect(repository.update).toHaveBeenCalledWith(event.id, { durationMins: 180 });
+    });
   });
 
   describe('DELETE /api/events/:id', () => {

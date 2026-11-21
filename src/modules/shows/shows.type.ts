@@ -5,12 +5,14 @@ export type CreateShowInput = z.infer<typeof createShowSchema>;
 export type UpdateShowInput = z.infer<typeof updateShowSchema>;
 export type ListShowsQuery = z.infer<typeof listShowQuerySchema>;
 
-// startsAt is an ISO 8601 string in UTC. Only the repository works with Date.
+// startsAt and endsAt are ISO 8601 strings in UTC. Only the repository works with Date.
+// endsAt is derived: startsAt + the event's durationMins. Clients never send it.
 export type Show = {
   id: string;
   eventId: string;
   screenId: string;
   startsAt: string;
+  endsAt: string;
   priceMinor: number;
 };
 

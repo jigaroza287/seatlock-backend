@@ -19,6 +19,7 @@ In `pg`, the error object carries `code`, `constraint`, `table` and `detail`.
 | `23503`  | foreign_key_violation       | Insert or update points to a missing parent  | **400** | `VALIDATION_ERROR`      |
 | `23503`  | foreign_key_violation       | Same, parent id comes from the URL path      | **404** | `<PARENT>_NOT_FOUND`    |
 | `23001`  | restrict_violation          | Delete blocked by `ON DELETE RESTRICT`       | **409** | `<ENTITY>_CONFLICT`     |
+| `23P01`  | exclusion_violation         | Row overlaps another, e.g. two shows         | **409** | `<ENTITY>_CONFLICT`     |
 | `23514`  | check_violation             | Value breaks a CHECK (Zod gap)               | **400** | `VALIDATION_ERROR`      |
 | `23502`  | not_null_violation          | Required column missing (Zod gap)            | **400** | `VALIDATION_ERROR`      |
 | `22P02`  | invalid_text_representation | Bad input for a type, e.g. `'abc'` as a uuid | **400** | `VALIDATION_ERROR`      |
@@ -78,6 +79,19 @@ These FKs only ever receive an id from the path, so the constraint name is enoug
 | `seats_category_fkey`, `events_category_fkey` | Delete a lookup row             | n/a               | 500                        |
 
 `seats_screen_id_fkey` is `ON DELETE CASCADE`: deleting a screen removes its seats with no error. If the screen has shows, `shows_screen_id_fkey` blocks the whole delete first.
+
+### 23P01 exclusion_violation → 409
+
+| Constraint         | Trigger                                                    | API code         | Message                            |
+| ------------------ | ---------------------------------------------------------- | ---------------- | ---------------------------------- |
+| `shows_no_overlap` | Show create or `startsAt` update overlaps another show     | `SHOW_CONFLICT`  | Shows on this screen would overlap |
+| `shows_no_overlap` | Event `durationMins` update makes two of its shows overlap | `EVENT_CONFLICT` | Shows on this screen would overlap |
+
+`shows_no_overlap` is `EXCLUDE USING gist (screen_id WITH =, tstzrange(starts_at, ends_at) WITH &&)`. The range is half-open, so back-to-back shows pass. Two shows with the same `startsAt` can hit `shows_screen_id_starts_at_key` (23505) instead; both return 409.
+
+**Prisma code depends on the query type.** Through the query API (`show.create`, `show.update`), 23P01 has no Prisma code and arrives as `P2039`. Through raw SQL (`$executeRaw`, `$queryRaw`), Prisma wraps every database error in `P2010`. `toAppError` maps 23P01 under both. Any other `P2010` stays a 500.
+
+The adapter gives no `constraint` field for 23P01, so the name is read from the message, as for 23514.
 
 ### 23514 check_violation → 400
 

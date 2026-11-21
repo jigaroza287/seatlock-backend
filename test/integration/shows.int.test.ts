@@ -51,7 +51,12 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(201);
       const created = (res.body as { data: Show }).data;
-      expect(created).toEqual({ id: expect.stringMatching(uuidV7) as string, ...input });
+      // endsAt = startsAt + the event's 90 minutes.
+      expect(created).toEqual({
+        id: expect.stringMatching(uuidV7) as string,
+        ...input,
+        endsAt: '2026-12-01T16:00:00.000Z',
+      });
       expect(res.headers['location']).toBe(`/api/shows/${created.id}`);
 
       const fetched = await request(app).get(`/api/shows/${created.id}`);
@@ -106,19 +111,51 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(201);
     });
+
+    // The existing show runs 14:30 to 16:00 (90 min event). shows_no_overlap raises 23P01.
+    it.each([
+      { reason: 'starts during it', startsAt: '2026-12-01T15:00:00Z' },
+      { reason: 'ends during it', startsAt: '2026-12-01T13:30:00Z' },
+    ])('returns 409 when the new show $reason', async ({ startsAt }) => {
+      await createShow();
+
+      const res = await request(app)
+        .post('/api/shows')
+        .send({ ...input, startsAt });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
+    });
+
+    // [startsAt, endsAt) is half-open, so touching ends don't overlap.
+    it.each([
+      { reason: 'starts exactly when it ends', startsAt: '2026-12-01T16:00:00Z' },
+      { reason: 'ends exactly when it starts', startsAt: '2026-12-01T13:00:00Z' },
+    ])('allows a back-to-back show that $reason', async ({ startsAt }) => {
+      await createShow();
+
+      const res = await request(app)
+        .post('/api/shows')
+        .send({ ...input, startsAt });
+
+      expect(res.status).toBe(201);
+    });
   });
 
   describe('GET /api/shows', () => {
     let otherEventId: string;
     let otherScreenId: string;
 
-    // Three shows on one IST day, one the day before, and one at 18:00 on another screen and event.
+    // Two shows on one IST day, one the day before, and one at 18:00 on another screen and event.
+    // Shows on one screen can't overlap: the 22:30 IST show ends (90 min) exactly at midnight.
     beforeEach(async () => {
       otherEventId = await createEventId('Rock concert');
       otherScreenId = await createScreenId('Screen 2');
       await createShow({ startsAt: '2026-11-20T12:30:00Z' }); // 18:00 IST, Nov 20
       await createShow({ startsAt: '2026-11-19T18:30:00Z' }); // 00:00 IST, Nov 20
-      await createShow({ startsAt: '2026-11-19T18:29:00Z' }); // 23:59 IST, Nov 19
+      await createShow({ startsAt: '2026-11-19T17:00:00Z' }); // 22:30 IST, Nov 19
       await createShow({
         eventId: otherEventId,
         screenId: otherScreenId,
@@ -131,7 +168,7 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(200);
       expect(startTimesOf(res.body)).toEqual([
-        '2026-11-19T18:29:00.000Z',
+        '2026-11-19T17:00:00.000Z',
         '2026-11-19T18:30:00.000Z',
         '2026-11-20T12:30:00.000Z',
         '2026-11-20T12:30:00.000Z',
@@ -190,7 +227,7 @@ describe('shows integration', () => {
     it('excludes a show that starts exactly at to', async () => {
       const res = await request(app).get(`/api/shows?screenId=${screenId}&to=2026-11-19T18:30:00Z`);
 
-      expect(startTimesOf(res.body)).toEqual(['2026-11-19T18:29:00.000Z']);
+      expect(startTimesOf(res.body)).toEqual(['2026-11-19T17:00:00.000Z']);
     });
 
     it('pages with limit and offset while total counts every match', async () => {
@@ -210,7 +247,13 @@ describe('shows integration', () => {
         .patch(`/api/shows/${created.id}`)
         .send({ startsAt: '2026-12-01T23:00:00+05:30', priceMinor: 0 });
 
-      const expected = { ...created, startsAt: '2026-12-01T17:30:00.000Z', priceMinor: 0 };
+      // endsAt moves with startsAt.
+      const expected = {
+        ...created,
+        startsAt: '2026-12-01T17:30:00.000Z',
+        endsAt: '2026-12-01T19:00:00.000Z',
+        priceMinor: 0,
+      };
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ data: expected });
 
@@ -237,16 +280,41 @@ describe('shows integration', () => {
       expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
     });
 
-    it('returns 409 when moving onto a taken time on the same screen', async () => {
+    it('returns 409 when moving into an overlapping time on the same screen', async () => {
       await createShow();
       const other = await createShow({ startsAt: '2026-12-01T18:00:00Z' });
 
       const res = await request(app)
         .patch(`/api/shows/${other.id}`)
-        .send({ startsAt: input.startsAt });
+        .send({ startsAt: '2026-12-01T15:00:00Z' });
 
       expect(res.status).toBe(409);
-      expect(res.body).toMatchObject({ error: { code: 'SHOW_CONFLICT' } });
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
+    });
+
+    // The new range overlaps the show's own old range; the constraint only compares other rows.
+    it('allows moving a show by less than its duration', async () => {
+      const created = await createShow();
+
+      const res = await request(app)
+        .patch(`/api/shows/${created.id}`)
+        .send({ startsAt: '2026-12-01T15:00:00Z' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        data: { startsAt: '2026-12-01T15:00:00.000Z', endsAt: '2026-12-01T16:30:00.000Z' },
+      });
+    });
+
+    it('keeps startsAt and endsAt when only priceMinor changes', async () => {
+      const created = await createShow();
+
+      const res = await request(app).patch(`/api/shows/${created.id}`).send({ priceMinor: 0 });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ data: { ...created, priceMinor: 0 } });
     });
   });
 

@@ -20,7 +20,8 @@ vi.mock('../../../db/prisma.js', () => ({ prisma: {} }));
 
 const showUrl = `/api/shows/${show.id}`;
 
-const conflict = AppError.conflict('Show', 'This screen already has a show at this time');
+// What toAppError returns for shows_no_overlap.
+const overlap = AppError.conflict('Show', 'Shows on this screen would overlap');
 // What toAppError returns for shows_event_id_fkey on create or update.
 const unknownEvent = new AppError(400, 'VALIDATION_ERROR', 'Invalid request', [
   { field: 'eventId', message: 'Event does not exist' },
@@ -154,13 +155,15 @@ describe('shows routes', () => {
       });
     });
 
-    it('returns 409 when the screen already has a show at this time', async () => {
-      repository.create.mockRejectedValue(conflict);
+    it('returns 409 when the show overlaps another show on the screen', async () => {
+      repository.create.mockRejectedValue(overlap);
 
       const res = await request(app).post('/api/shows').send(showInput);
 
       expect(res.status).toBe(409);
-      expect(res.body).toMatchObject({ error: { code: 'SHOW_CONFLICT' } });
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
     });
   });
 
@@ -200,13 +203,15 @@ describe('shows routes', () => {
       expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
     });
 
-    it('returns 409 when the screen already has a show at the new time', async () => {
-      repository.update.mockRejectedValue(conflict);
+    it('returns 409 when the new time overlaps another show on the screen', async () => {
+      repository.update.mockRejectedValue(overlap);
 
       const res = await request(app).patch(showUrl).send({ startsAt: '2026-12-01T18:00:00Z' });
 
       expect(res.status).toBe(409);
-      expect(res.body).toMatchObject({ error: { code: 'SHOW_CONFLICT' } });
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
     });
   });
 
