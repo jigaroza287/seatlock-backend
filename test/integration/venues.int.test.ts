@@ -69,6 +69,17 @@ describe('venues integration', () => {
 
       expect(res.status).toBe(201);
     });
+
+    // The unique constraint, not a lookup before the insert, decides the winner.
+    it('lets exactly one of two parallel identical creates win', async () => {
+      const [first, second] = await Promise.all([
+        request(app).post('/api/venues').send(venueInput),
+        request(app).post('/api/venues').send(venueInput),
+      ]);
+
+      expect([first.status, second.status].sort((a, b) => a - b)).toEqual([201, 409]);
+      expect(await prisma.venue.count()).toBe(1);
+    });
   });
 
   describe('GET /api/venues', () => {

@@ -142,6 +142,20 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(201);
     });
+
+    // Both requests run at once, so neither can see the other's row before inserting.
+    // Only shows_no_overlap can stop the second one.
+    it('lets exactly one of two parallel overlapping creates win', async () => {
+      const [first, second] = await Promise.all([
+        request(app).post('/api/shows').send(input),
+        request(app)
+          .post('/api/shows')
+          .send({ ...input, startsAt: '2026-12-01T15:00:00Z' }),
+      ]);
+
+      expect([first.status, second.status].sort((a, b) => a - b)).toEqual([201, 409]);
+      expect(await prisma.show.count({ where: { screenId } })).toBe(1);
+    });
   });
 
   describe('GET /api/shows', () => {

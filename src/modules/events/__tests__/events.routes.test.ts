@@ -170,6 +170,7 @@ describe('events routes', () => {
 
     it.each([
       { reason: 'the body is empty', body: {} },
+      { reason: 'the body has an id', body: { id: event.id } },
       { reason: 'the body has an unknown field', body: { venue: 'Main hall' } },
     ])('returns 400 when $reason', async ({ body }) => {
       const res = await request(app).patch(eventUrl).send(body);
