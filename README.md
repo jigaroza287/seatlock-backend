@@ -34,14 +34,15 @@ Stop `pnpm dev` first: both use port 8000. Inside Compose the API reaches Postgr
 
 ## Environment variables
 
-| Variable            | Used by         | Purpose                                                          |
-| ------------------- | --------------- | ---------------------------------------------------------------- |
-| `PORT`              | API             | HTTP port, default `8000`                                        |
-| `POSTGRES_USER`     | Docker          | Database user created on first start                             |
-| `POSTGRES_PASSWORD` | Docker          | Password for that user; required                                 |
-| `POSTGRES_DB`       | Docker          | Database created on first start                                  |
-| `DB_PORT`           | Docker          | Host port for Postgres; `5433` avoids a local Postgres on `5432` |
-| `DATABASE_URL`      | API, Prisma CLI | Connection string; must match the four values above              |
+| Variable               | Used by         | Purpose                                                                                |
+| ---------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| `PORT`                 | API             | HTTP port, default `8000`                                                              |
+| `POSTGRES_USER`        | Docker          | Database user created on first start                                                   |
+| `POSTGRES_PASSWORD`    | Docker          | Password for that user; required                                                       |
+| `POSTGRES_DB`          | Docker          | Database created on first start                                                        |
+| `DB_PORT`              | Docker          | Host port for Postgres; `5433` avoids a local Postgres on `5432`                       |
+| `DATABASE_URL`         | API, Prisma CLI | Connection string; must match the four values above                                    |
+| `BOOKING_HOLD_MINUTES` | API             | How long a reserved seat is held, integer 5 to 30, default `10`; invalid stops startup |
 
 Postgres applies `POSTGRES_*` only when the volume is first created. After changing them, run `docker compose down -v` (deletes data) or update the user with `ALTER USER`.
 
@@ -90,6 +91,7 @@ Database error to HTTP mapping: [`docs/pg-errors.md`](docs/pg-errors.md).
 src/
   server.ts            entry: checks the database, listens, graceful shutdown
   app.ts               Express app: middleware, routes, 404, error handler
+  config/env.ts        env vars parsed with Zod on startup
   db/prisma.ts         Prisma client and connection pool
   middleware/          request id, error handler
   modules/events/      routes, controller, service, repository, schemas, tests
