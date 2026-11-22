@@ -7,6 +7,26 @@ datasource db {
   provider = "postgresql"
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Booking {
+  id          String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  showId      String     @map("show_id") @db.Uuid
+  // Placeholder until auth: becomes customer_email in the W5 migration drill, then a user_id FK in M3/M4.
+  customerRef String     @map("customer_ref")
+  status      String     @default("pending")
+  // Price snapshot taken at reservation; a later show price change doesn't touch it.
+  totalMinor  Int        @map("total_minor")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Not @updatedAt: booking writes use raw SQL, so every UPDATE sets updated_at = now() itself.
+  updatedAt   DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  // Bookings are never deleted, only cancelled or expired, so a show with bookings can't be deleted.
+  show        Show       @relation(fields: [showId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  showSeats   ShowSeat[]
+
+  // CHECKs in migration booking_core: status IN ('pending', 'confirmed', 'cancelled', 'expired'), total_minor >= 0.
+  @@map("bookings")
+}
+
 model EventCategory {
   code   String  @id
   label  String
@@ -65,6 +85,7 @@ model Seat {
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   seatCategory SeatCategory @relation(fields: [category], references: [code], onUpdate: NoAction)
   screen       Screen       @relation(fields: [screenId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  showSeats    ShowSeat[]
 
   @@unique([screenId, rowLabel, seatNumber])
   @@map("seats")
@@ -72,18 +93,44 @@ model Seat {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model Show {
-  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  eventId    String   @map("event_id") @db.Uuid
-  screenId   String   @map("screen_id") @db.Uuid
-  startsAt   DateTime @map("starts_at") @db.Timestamptz(6)
-  endsAt     DateTime @map("ends_at") @db.Timestamptz(6)
-  priceMinor Int      @map("price_minor")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  event      Event    @relation(fields: [eventId], references: [id], onUpdate: NoAction)
-  screen     Screen   @relation(fields: [screenId], references: [id], onUpdate: NoAction)
+  id         String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  eventId    String     @map("event_id") @db.Uuid
+  screenId   String     @map("screen_id") @db.Uuid
+  startsAt   DateTime   @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime   @map("ends_at") @db.Timestamptz(6)
+  priceMinor Int        @map("price_minor")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  event      Event      @relation(fields: [eventId], references: [id], onUpdate: NoAction)
+  screen     Screen     @relation(fields: [screenId], references: [id], onUpdate: NoAction)
+  bookings   Booking[]
+  showSeats  ShowSeat[]
 
   @@unique([screenId, startsAt])
   @@map("shows")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// One row per seat per show: the row a booking locks or version-checks.
+model ShowSeat {
+  showId    String    @map("show_id") @db.Uuid
+  seatId    String    @map("seat_id") @db.Uuid
+  status    String    @default("available")
+  bookingId String?   @map("booking_id") @db.Uuid
+  // Set from the database clock: now() + BOOKING_HOLD_MINUTES.
+  heldUntil DateTime? @map("held_until") @db.Timestamptz(6)
+  version   Int       @default(0)
+  // Not @updatedAt: booking writes use raw SQL, so every UPDATE sets updated_at = now() itself.
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  // Seat inventory belongs to the show; an unbooked show takes its rows with it.
+  show      Show      @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // A seat that belongs to a scheduled show can't be deleted.
+  seat      Seat      @relation(fields: [seatId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  booking   Booking?  @relation(fields: [bookingId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  // CHECKs in migration booking_core: status IN ('available', 'reserved', 'booked'), version >= 0, and
+  // show_seats_state_check tying each status to booking_id and held_until.
+  @@id([showId, seatId])
+  @@map("show_seats")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

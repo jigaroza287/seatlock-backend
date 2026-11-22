@@ -71,14 +71,21 @@ These FKs only ever receive an id from the path, so the constraint name is enoug
 
 ### 23001 restrict_violation (delete) → 409
 
-| Constraint                                    | Trigger                         | API code          | Message                    |
-| --------------------------------------------- | ------------------------------- | ----------------- | -------------------------- |
-| `screens_venue_id_fkey`                       | Delete a venue that has screens | `VENUE_CONFLICT`  | Venue still has screens    |
-| `shows_screen_id_fkey`                        | Delete a screen that has shows  | `SCREEN_CONFLICT` | Screen has scheduled shows |
-| `shows_event_id_fkey`                         | Delete an event that has shows  | `EVENT_CONFLICT`  | Event has scheduled shows  |
-| `seats_category_fkey`, `events_category_fkey` | Delete a lookup row             | n/a               | 500                        |
+| Constraint                                    | Trigger                                 | API code          | Message                    |
+| --------------------------------------------- | --------------------------------------- | ----------------- | -------------------------- |
+| `screens_venue_id_fkey`                       | Delete a venue that has screens         | `VENUE_CONFLICT`  | Venue still has screens    |
+| `shows_screen_id_fkey`                        | Delete a screen that has shows          | `SCREEN_CONFLICT` | Screen has scheduled shows |
+| `shows_event_id_fkey`                         | Delete an event that has shows          | `EVENT_CONFLICT`  | Event has scheduled shows  |
+| `show_seats_seat_id_fkey`                     | Delete a seat used by a show            | `SEAT_CONFLICT`   | Seat is used by a show     |
+| `bookings_show_id_fkey`                       | Delete a show that has bookings         | `SHOW_CONFLICT`   | Show has bookings          |
+| `show_seats_booking_id_fkey`                  | Delete a booking (never done; bug only) | n/a               | 500                        |
+| `seats_category_fkey`, `events_category_fkey` | Delete a lookup row                     | n/a               | 500                        |
 
 `seats_screen_id_fkey` is `ON DELETE CASCADE`: deleting a screen removes its seats with no error. If the screen has shows, `shows_screen_id_fkey` blocks the whole delete first.
+
+`show_seats_show_id_fkey` is `ON DELETE CASCADE`: deleting a show with no bookings removes its `show_seats` rows. If the show has bookings, `bookings_show_id_fkey` blocks the whole delete first.
+
+Nothing writes `show_seats` or `bookings` yet, so the two new 409 rows can't fire today. Add their messages to `RESTRICT_MESSAGES` when the booking module lands; until then the generic `<Entity> is still referenced` applies.
 
 ### 23P01 exclusion_violation → 409
 
@@ -110,6 +117,16 @@ The adapter gives no `constraint` field for 23P01, so the name is read from the 
 | `events_language_length_check`                  | Trimmed language exactly 2 chars     | `language`     |
 | `shows_price_minor_non_negative_check`          | `price_minor >= 0`                   | `priceMinor`   |
 | `seat_categories_sort_order_non_negative_check` | Reference data only                  | 500            |
+
+**Booking tables: server-set columns → 500.** The client never sends these values, so a hit is a bug, not a Zod gap. Booking writes use raw SQL, so the error arrives as `P2010`, which `toAppError` leaves as a 500.
+
+| Constraint                                | Rule                                                                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `bookings_status_check`                   | `status` is `pending`, `confirmed`, `cancelled` or `expired`                                                     |
+| `bookings_total_minor_non_negative_check` | `total_minor >= 0`                                                                                               |
+| `show_seats_status_check`                 | `status` is `available`, `reserved` or `booked`                                                                  |
+| `show_seats_version_non_negative_check`   | `version >= 0`                                                                                                   |
+| `show_seats_state_check`                  | `available`: no `booking_id`, no `held_until`; `reserved`: both set; `booked`: `booking_id` set, no `held_until` |
 
 ### 23502 not_null_violation and 22P02 invalid_text_representation → 400
 
