@@ -42,6 +42,7 @@ Prisma config lives in `prisma7.config.ts` (non-default name).
 src/
   server.ts            entry: checks the DB, listens, graceful shutdown
   app.ts               Express app: middleware, routes, 404, error handler
+  config/env.ts        env vars parsed with Zod on startup
   db/prisma.ts         Prisma client (pg adapter, pool settings)
   middleware/          request id, global error handler
   modules/<name>/      one folder per feature:
@@ -71,7 +72,7 @@ docs/                  api-contract.md, pg-errors.md
 - Files: kebab-case, named `<module>.<layer>.ts`.
 - Interfaces take an `I` prefix (`IEventRepository`); the implementing class gets the plain name (`EventRepository`). No implementation prefixes like `Prisma` in class names.
 - Relative imports end in `.js` (NodeNext). Use `import type` for type-only imports.
-- Env vars are read as `process.env['NAME']`. Document every new one in `.env.example`.
+- New env vars go in `src/config/env.ts` (Zod, parsed on startup). Document every new one in `.env.example`.
 - Responses: `{ data }`; lists `{ data, pagination }`.
 - Errors: `{ error: { code, message, details? } }`, built with `AppError` factories (`AppError.notFound`, `AppError.conflict`).
 - Status codes: 201 with `Location` on create, 204 on delete, 400 for validation, 404 before 409 on update.
