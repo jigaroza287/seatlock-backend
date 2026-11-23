@@ -55,13 +55,13 @@ Every list endpoint accepts these, plus its own filters.
 
 ### Error codes
 
-| HTTP | Code                    | When                                                                            |
-| ---- | ----------------------- | ------------------------------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`      | Invalid body, query, path id or malformed JSON; missing referenced id           |
-| 404  | `<ENTITY>_NOT_FOUND`    | Resource or parent resource does not exist                                      |
-| 404  | `ROUTE_NOT_FOUND`       | No route matches the method and path                                            |
-| 409  | `<ENTITY>_CONFLICT`     | Unique constraint hit, shows would overlap, or delete blocked by dependent rows |
-| 500  | `INTERNAL_SERVER_ERROR` | Unexpected error                                                                |
+| HTTP | Code                    | When                                                                                                            |
+| ---- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`      | Invalid body, query, path id or malformed JSON; missing referenced id                                           |
+| 404  | `<ENTITY>_NOT_FOUND`    | Resource or parent resource does not exist                                                                      |
+| 404  | `ROUTE_NOT_FOUND`       | No route matches the method and path                                                                            |
+| 409  | `<ENTITY>_CONFLICT`     | Unique constraint hit, shows would overlap, show on a screen with no seats, or delete blocked by dependent rows |
+| 500  | `INTERNAL_SERVER_ERROR` | Unexpected error                                                                                                |
 
 `<ENTITY>` is one of `EVENT`, `VENUE`, `SCREEN`, `SEAT`, `SHOW`.
 
@@ -179,7 +179,7 @@ A seat belongs to one screen. Create and list are nested under the screen; singl
 | GET    | `/api/screens/:screenId/seats` | None                                                         | 200 + paginated list                   | 400 invalid id or query params, 404 screen not found                                    |
 | GET    | `/api/seats/:id`               | None                                                         | 200 + seat                             | 400 invalid id, 404 not found                                                           |
 | PATCH  | `/api/seats/:id`               | Any non-empty subset of `{ rowLabel, seatNumber, category }` | 200 + updated seat                     | 400 invalid body or `id` in body, 404 not found, 409 seat already exists on this screen |
-| DELETE | `/api/seats/:id`               | None                                                         | 204 No Content                         | 400 invalid id, 404 not found                                                           |
+| DELETE | `/api/seats/:id`               | None                                                         | 204 No Content                         | 400 invalid id, 404 not found, 409 seat is used by a show                               |
 
 `Location` points to `/api/seats/:id`.
 
@@ -228,7 +228,7 @@ A show is one event playing on one screen at one time.
 
 | Method | Path             | Body                                               | Success                                | Error                                                                                                                      |
 | ------ | ---------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen                               |
+| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen or screen has no seats        |
 | GET    | `/api/shows`     | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                                   |
 | GET    | `/api/shows/:id` | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                              |
 | PATCH  | `/api/shows/:id` | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
@@ -246,6 +246,8 @@ A show is one event playing on one screen at one time.
 | priceMinor | number | Yes                | Integer in paise, 0 to 2147483647 (Postgres `integer` max); `0` means free |
 
 Shows on one screen can't overlap. The database enforces this on `[startsAt, endsAt)`, a half-open range, so a show may start at the exact time the previous one ends. An overlap returns 409 `SHOW_CONFLICT`.
+
+Creating a show also creates its seat inventory: one available seat per seat on the screen, in the same transaction. A screen with no seats returns 409 `SHOW_CONFLICT` and no show is saved.
 
 `endsAt` follows `startsAt` on PATCH and the event's `durationMins` when the event changes. Sending `endsAt` returns 400.
 

@@ -86,6 +86,19 @@ describe('toAppError', () => {
       });
     });
 
+    it('returns 409 on seat delete when a show still uses the seat (23001)', () => {
+      const error = prismaError('P2003', {
+        originalCode: '23001',
+        constraint: { index: 'show_seats_seat_id_fkey' },
+      });
+
+      expect(toAppError(error, 'Seat', 'delete')).toMatchObject({
+        statusCode: 409,
+        code: 'SEAT_CONFLICT',
+        message: 'Seat is used by a show',
+      });
+    });
+
     it('returns 409 with a fallback message on delete when the constraint is unknown', () => {
       expect(toAppError(prismaError('P2003'), 'Event', 'delete')).toMatchObject({
         statusCode: 409,

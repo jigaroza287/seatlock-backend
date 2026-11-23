@@ -22,6 +22,8 @@ const showUrl = `/api/shows/${show.id}`;
 
 // What toAppError returns for shows_no_overlap.
 const overlap = AppError.conflict('Show', 'Shows on this screen would overlap');
+// What the repository throws when the screen has no seats to copy into show_seats.
+const noSeats = AppError.conflict('Show', 'Screen has no seats');
 // What toAppError returns for shows_event_id_fkey on create or update.
 const unknownEvent = new AppError(400, 'VALIDATION_ERROR', 'Invalid request', [
   { field: 'eventId', message: 'Event does not exist' },
@@ -163,6 +165,17 @@ describe('shows routes', () => {
       expect(res.status).toBe(409);
       expect(res.body).toMatchObject({
         error: { code: 'SHOW_CONFLICT', message: 'Shows on this screen would overlap' },
+      });
+    });
+
+    it('returns 409 when the screen has no seats', async () => {
+      repository.create.mockRejectedValue(noSeats);
+
+      const res = await request(app).post('/api/shows').send(showInput);
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Screen has no seats' },
       });
     });
   });

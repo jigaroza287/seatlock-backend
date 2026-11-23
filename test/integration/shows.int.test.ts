@@ -16,10 +16,24 @@ async function createEventId(title = eventInput.title): Promise<string> {
   return row.id;
 }
 
-async function createScreenId(name = 'Screen 1'): Promise<string> {
+async function createEmptyScreenId(name = 'Screen 1'): Promise<string> {
   const venue = await prisma.venue.create({ data: { name: `Venue for ${name}`, city: 'Pune' } });
   const row = await prisma.screen.create({ data: { name, venueId: venue.id } });
   return row.id;
+}
+
+// Show create needs seats to copy into show_seats, so every screen gets A1 to A3.
+async function createScreenId(name = 'Screen 1'): Promise<string> {
+  const screenId = await createEmptyScreenId(name);
+  await prisma.seat.createMany({
+    data: [1, 2, 3].map((seatNumber) => ({
+      screenId,
+      rowLabel: 'A',
+      seatNumber,
+      category: 'standard',
+    })),
+  });
+  return screenId;
 }
 
 function startTimesOf(body: unknown): string[] {
@@ -62,6 +76,35 @@ describe('shows integration', () => {
       const fetched = await request(app).get(`/api/shows/${created.id}`);
       expect(fetched.status).toBe(200);
       expect(fetched.body).toEqual({ data: created });
+    });
+
+    it('creates one available show seat per seat on the screen', async () => {
+      const created = await createShow();
+
+      const seatIds = await prisma.seat.findMany({ where: { screenId }, select: { id: true } });
+      const showSeats = await prisma.showSeat.findMany({ where: { showId: created.id } });
+      expect(showSeats).toHaveLength(seatIds.length);
+      expect(showSeats.map((row) => row.seatId).sort()).toEqual(
+        seatIds.map((seat) => seat.id).sort()
+      );
+      for (const row of showSeats) {
+        expect(row).toMatchObject({ status: 'available', bookingId: null, heldUntil: null });
+      }
+    });
+
+    // The show insert runs before the seat check, so 0 shows proves the transaction rolled back.
+    it('returns 409 and saves no show when the screen has no seats', async () => {
+      const emptyScreenId = await createEmptyScreenId('Screen 2');
+
+      const res = await request(app)
+        .post('/api/shows')
+        .send({ ...input, screenId: emptyScreenId });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'SHOW_CONFLICT', message: 'Screen has no seats' },
+      });
+      expect(await prisma.show.count({ where: { screenId: emptyScreenId } })).toBe(0);
     });
 
     it('returns startsAt in UTC when sent with an offset', async () => {

@@ -1,10 +1,10 @@
 -- Seatlock demo data for local development and SQL practice.
--- Run after schema.sql. Safe to re-run: it clears catalog tables first.
--- Lookup tables (event_categories, seat_categories) are reference data and live in schema.sql.
+-- Run with `pnpm db:seed` after `pnpm db:migrate`. Safe to re-run: it clears catalog and booking tables first.
+-- Lookup tables (event_categories, seat_categories) are reference data, seeded by the 0_init migration.
 --
 -- Fixed UUID v7-format ids so queries can use them:
 --   venues  ...0101+   screens ...0201+   events ...0301+   shows ...0401+
--- Seats use generated ids (nothing references them yet).
+-- Seats use generated ids; show_seats picks them up by screen, not by id.
 --
 -- Deliberate edge cases for the practice queries:
 --   - Lakeview Cinemas has a NULL address                  (IS NULL)
@@ -15,7 +15,10 @@
 --   - One free show (price_minor = 0)
 BEGIN;
 
-TRUNCATE shows,
+-- Every table with an FK into these must be listed too, or Postgres refuses the TRUNCATE.
+TRUNCATE show_seats,
+bookings,
+shows,
 seats,
 screens,
 events,
@@ -183,64 +186,95 @@ VALUES
   );
 
 -- Times are IST (+05:30); Postgres stores them as UTC.
+-- ends_at = starts_at + the event's duration, the same rule the API applies on create.
 INSERT INTO
-  shows (id, event_id, screen_id, starts_at, price_minor)
-VALUES
+  shows (
+    id,
+    event_id,
+    screen_id,
+    starts_at,
+    ends_at,
+    price_minor
+  )
+SELECT
+  v.id::uuid,
+  e.id,
+  v.screen_id::uuid,
+  v.starts_at::timestamptz,
+  v.starts_at::timestamptz + e.duration_mins * interval '1 minute',
+  v.price_minor
+FROM
   (
-    '01900000-0000-7000-8000-000000000401',
-    '01900000-0000-7000-8000-000000000301',
-    '01900000-0000-7000-8000-000000000201',
-    '2026-11-06 19:30+05:30',
-    149900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000402',
-    '01900000-0000-7000-8000-000000000301',
-    '01900000-0000-7000-8000-000000000201',
-    '2026-11-07 19:30+05:30',
-    179900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000403',
-    '01900000-0000-7000-8000-000000000302',
-    '01900000-0000-7000-8000-000000000202',
-    '2026-11-06 21:00+05:30',
-    49900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000404',
-    '01900000-0000-7000-8000-000000000302',
-    '01900000-0000-7000-8000-000000000201',
-    '2026-11-09 20:00+05:30',
-    59900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000405',
-    '01900000-0000-7000-8000-000000000303',
-    '01900000-0000-7000-8000-000000000202',
-    '2026-11-07 10:00+05:30',
-    19900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000406',
-    '01900000-0000-7000-8000-000000000303',
-    '01900000-0000-7000-8000-000000000202',
-    '2026-11-07 13:30+05:30',
-    24900
-  ),
-  (
-    '01900000-0000-7000-8000-000000000407',
-    '01900000-0000-7000-8000-000000000303',
-    '01900000-0000-7000-8000-000000000203',
-    '2026-11-07 13:30+05:30',
-    0
-  ),
-  (
-    '01900000-0000-7000-8000-000000000408',
-    '01900000-0000-7000-8000-000000000302',
-    '01900000-0000-7000-8000-000000000203',
-    '2026-11-08 18:00+05:30',
-    39900
-  );
+    VALUES
+      (
+        '01900000-0000-7000-8000-000000000401',
+        '01900000-0000-7000-8000-000000000301',
+        '01900000-0000-7000-8000-000000000201',
+        '2026-11-06 19:30+05:30',
+        149900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000402',
+        '01900000-0000-7000-8000-000000000301',
+        '01900000-0000-7000-8000-000000000201',
+        '2026-11-07 19:30+05:30',
+        179900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000403',
+        '01900000-0000-7000-8000-000000000302',
+        '01900000-0000-7000-8000-000000000202',
+        '2026-11-06 21:00+05:30',
+        49900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000404',
+        '01900000-0000-7000-8000-000000000302',
+        '01900000-0000-7000-8000-000000000201',
+        '2026-11-09 20:00+05:30',
+        59900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000405',
+        '01900000-0000-7000-8000-000000000303',
+        '01900000-0000-7000-8000-000000000202',
+        '2026-11-07 10:00+05:30',
+        19900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000406',
+        '01900000-0000-7000-8000-000000000303',
+        '01900000-0000-7000-8000-000000000202',
+        '2026-11-07 13:30+05:30',
+        24900
+      ),
+      (
+        '01900000-0000-7000-8000-000000000407',
+        '01900000-0000-7000-8000-000000000303',
+        '01900000-0000-7000-8000-000000000203',
+        '2026-11-07 13:30+05:30',
+        0
+      ),
+      (
+        '01900000-0000-7000-8000-000000000408',
+        '01900000-0000-7000-8000-000000000302',
+        '01900000-0000-7000-8000-000000000203',
+        '2026-11-08 18:00+05:30',
+        39900
+      )
+  ) AS v (id, event_id, screen_id, starts_at, price_minor)
+  JOIN events e ON e.id = v.event_id::uuid;
+
+-- One available show seat per seat on the show's screen, same as show create in the API.
+-- On a fresh database the backfill migration runs before this seed and finds no shows,
+-- so the seed has to create these rows itself.
+INSERT INTO
+  show_seats (show_id, seat_id)
+SELECT
+  s.id,
+  st.id
+FROM
+  shows s
+  JOIN seats st ON st.screen_id = s.screen_id;
 
 COMMIT;

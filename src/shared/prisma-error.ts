@@ -36,6 +36,7 @@ const RESTRICT_MESSAGES: Record<string, string> = {
   screens_venue_id_fkey: 'Venue still has screens',
   shows_screen_id_fkey: 'Screen has scheduled shows',
   shows_event_id_fkey: 'Event has scheduled shows',
+  show_seats_seat_id_fkey: 'Seat is used by a show',
 };
 
 // 23514 check_violation -> 400

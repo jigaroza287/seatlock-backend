@@ -85,7 +85,7 @@ These FKs only ever receive an id from the path, so the constraint name is enoug
 
 `show_seats_show_id_fkey` is `ON DELETE CASCADE`: deleting a show with no bookings removes its `show_seats` rows. If the show has bookings, `bookings_show_id_fkey` blocks the whole delete first.
 
-Nothing writes `show_seats` or `bookings` yet, so the two new 409 rows can't fire today. Add their messages to `RESTRICT_MESSAGES` when the booking module lands; until then the generic `<Entity> is still referenced` applies.
+Show create writes `show_seats`, so `show_seats_seat_id_fkey` fires on deleting a seat of a screen that has shows. Nothing writes `bookings` yet, so `bookings_show_id_fkey` can't fire today. Add its message to `RESTRICT_MESSAGES` when the booking module lands; until then the generic `<Entity> is still referenced` applies.
 
 ### 23P01 exclusion_violation → 409
 
