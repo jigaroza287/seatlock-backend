@@ -96,6 +96,7 @@ Both tables have `updated_at timestamptz DEFAULT now()`, but it is **not** Prism
 ## Consequences
 
 - Concurrency control has a concrete row to work on: row locks or a version check on `show_seats.version`. The choice between them is outside this ADR.
-- `show_seats` rows must exist before a show can be booked. Nothing creates them yet.
+- `show_seats` rows must exist before a show can be booked. Show create inserts them in the same transaction, so a show never exists without its seats.
+- Seats added to a screen while a show is being created on it can be missed by that show. Accepted: seat layout changes on scheduled screens are rare admin actions.
 - Two new 409 cases appear once these tables hold data: deleting a seat used by a show, and deleting a show with bookings. Their messages are in `docs/pg-errors.md`.
 - `customer_ref` is a placeholder until auth exists.

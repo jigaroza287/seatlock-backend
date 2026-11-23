@@ -68,6 +68,8 @@ class ShowRepository implements IShowRepository {
   // endsAt = startsAt + event duration. The event row is read FOR SHARE so an event PATCH
   // that changes durationMins waits for this show to commit, then updates its endsAt too.
   // A missing screen fails on its FK, which toAppError maps to 400 with the field.
+  // The same transaction creates one available show_seats row per seat on the screen.
+  // A screen with no seats returns 409 and rolls back the show.
   async create(input: CreateShowInput): Promise<Show> {
     const { eventId, screenId, startsAt, priceMinor } = input;
     try {
@@ -85,7 +87,7 @@ class ShowRepository implements IShowRepository {
         }
 
         const startDate = new Date(startsAt);
-        return tx.show.create({
+        const show = await tx.show.create({
           data: {
             eventId,
             screenId,
@@ -94,6 +96,21 @@ class ShowRepository implements IShowRepository {
             priceMinor,
           },
         });
+
+        const seats = await tx.seat.findMany({
+          where: { screenId },
+          select: { id: true },
+        });
+
+        if (seats.length === 0) {
+          throw AppError.conflict('Show', 'Screen has no seats');
+        }
+
+        await tx.showSeat.createMany({
+          data: seats.map((seat) => ({ showId: show.id, seatId: seat.id })),
+        });
+
+        return show;
       });
 
       return toShow(newShow);

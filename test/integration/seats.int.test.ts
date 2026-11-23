@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/db/prisma.js';
+import { eventInput } from '../../src/modules/events/__tests__/events.fixtures.js';
 import { seatInput, seatLayoutInput } from '../../src/modules/seats/__tests__/seats.fixtures.js';
 import type { CreateSeatInput, Seat } from '../../src/modules/seats/seats.type.js';
 import { venueInput } from '../../src/modules/venues/__tests__/venues.fixtures.js';
@@ -203,6 +204,29 @@ describe('seats integration', () => {
 
       const fetched = await request(app).get(`/api/seats/${created.id}`);
       expect(fetched.status).toBe(404);
+    });
+
+    // Show create copies the seat into show_seats; show_seats_seat_id_fkey is ON DELETE RESTRICT.
+    it('returns 409 and keeps the seat when a show uses it', async () => {
+      const created = await createSeat(screenId);
+      const event = await prisma.event.create({ data: eventInput });
+      const show = await request(app).post('/api/shows').send({
+        eventId: event.id,
+        screenId,
+        startsAt: '2026-12-01T14:30:00.000Z',
+        priceMinor: 50_000,
+      });
+      expect(show.status).toBe(201);
+
+      const res = await request(app).delete(`/api/seats/${created.id}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'SEAT_CONFLICT', message: 'Seat is used by a show' },
+      });
+
+      const fetched = await request(app).get(`/api/seats/${created.id}`);
+      expect(fetched.status).toBe(200);
     });
 
     it('returns 404 when the seat does not exist', async () => {

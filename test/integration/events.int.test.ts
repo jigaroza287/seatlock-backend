@@ -27,6 +27,10 @@ function titlesOf(body: unknown): string[] {
 async function createScreenId(): Promise<string> {
   const venue = await prisma.venue.create({ data: { name: 'Main hall', city: 'Pune' } });
   const screen = await prisma.screen.create({ data: { name: 'Screen 1', venueId: venue.id } });
+  // Show create needs at least one seat to copy into show_seats.
+  await prisma.seat.create({
+    data: { screenId: screen.id, rowLabel: 'A', seatNumber: 1, category: 'standard' },
+  });
   return screen.id;
 }
 
