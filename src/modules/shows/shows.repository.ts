@@ -8,6 +8,7 @@ import type {
   ListShowsQuery,
   Show,
   ShowListOutput,
+  ShowSeatView,
   UpdateShowInput,
 } from './shows.type.js';
 
@@ -31,6 +32,18 @@ function toEndsAt(startsAt: Date, durationMins: number): Date {
 }
 
 type DurationRow = { durationMins: number };
+
+type SeatMapDbRow = {
+  id: string;
+  rowLabel: string;
+  seatNumber: number;
+  category: string;
+  isAvailable: boolean;
+};
+
+function toShowSeatView({ isAvailable, ...seat }: SeatMapDbRow): ShowSeatView {
+  return { ...seat, status: isAvailable ? 'available' : 'unavailable' };
+}
 
 class ShowRepository implements IShowRepository {
   constructor(private readonly db: PrismaClient) {}
@@ -63,6 +76,34 @@ class ShowRepository implements IShowRepository {
       return null;
     }
     return toShow(row);
+  }
+
+  // A reserved seat whose hold has passed counts as available: expired holds are not cleaned up
+  // yet, so the read applies the rule. The query returns a boolean, not a status string, because
+  // the $queryRaw generic is an unchecked cast while pg reliably maps boolean to a JS boolean.
+  // No rows means no show: creating a show on a screen with no seats is rejected, seats used by a
+  // show can't be deleted, and a screen with shows can't be deleted.
+  async findSeatMap(showId: string): Promise<ShowSeatView[] | null> {
+    const rows = await this.db.$queryRaw<SeatMapDbRow[]>`
+      SELECT
+        ss.seat_id     AS "id",
+        st.row_label   AS "rowLabel",
+        st.seat_number AS "seatNumber",
+        st.category,
+        (
+          ss.status = 'available'
+          OR (ss.status = 'reserved' AND ss.held_until < now())
+        )              AS "isAvailable"
+      FROM show_seats ss
+      JOIN seats st ON st.id = ss.seat_id
+      WHERE ss.show_id = ${showId}::uuid
+      ORDER BY st.row_label, st.seat_number
+    `;
+
+    if (rows.length === 0) {
+      return null;
+    }
+    return rows.map(toShowSeatView);
   }
 
   // endsAt = startsAt + event duration. The event row is read FOR SHARE so an event PATCH

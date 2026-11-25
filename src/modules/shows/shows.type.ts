@@ -18,9 +18,38 @@ export type Show = {
 
 export type ShowListOutput = { items: Show[]; total: number };
 
+// Clients see only whether a seat can be picked. Reserved and booked are both 'unavailable',
+// so the seat map doesn't reveal holds in progress.
+export type SeatStatus = 'available' | 'unavailable';
+
+// One seat of a show, as the repository returns it. rowLabel is kept so toSeatMap can group.
+export type ShowSeatView = {
+  id: string;
+  rowLabel: string;
+  seatNumber: number;
+  category: string;
+  status: SeatStatus;
+};
+
+// A seat inside a SeatMapRow: rowLabel is dropped because the row already carries it.
+export type SeatMapSeat = Omit<ShowSeatView, 'rowLabel'>;
+
+export type SeatMapRow = {
+  row: string;
+  seats: SeatMapSeat[];
+};
+
+export type SeatMap = {
+  showId: string;
+  available: number;
+  rows: SeatMapRow[];
+};
+
 export interface IShowRepository {
   findMany(query: ListShowsQuery): Promise<ShowListOutput>;
   findById(id: string): Promise<Show | null>;
+  // null when the show does not exist. A show always has at least one seat, see the repository.
+  findSeatMap(showId: string): Promise<ShowSeatView[] | null>;
   create(input: CreateShowInput): Promise<Show>;
   update(id: string, changes: UpdateShowInput): Promise<Show | null>;
   delete(id: string): Promise<boolean>;

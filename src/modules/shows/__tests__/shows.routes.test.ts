@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../../app.js';
 import { AppError } from '../../../shared/app-error.js';
 import type { IShowRepository } from '../shows.type.js';
-import { show, showInput } from './shows.fixtures.js';
+import { seatMap, show, showInput, showSeatViews } from './shows.fixtures.js';
 
 // Replace the Prisma repository so routes, controller, service and middleware run without a database.
 // vi.hoisted lets the vi.mock factory, which runs before imports, use these mocks.
 const repository = vi.hoisted(() => ({
   findMany: vi.fn<IShowRepository['findMany']>(),
   findById: vi.fn<IShowRepository['findById']>(),
+  findSeatMap: vi.fn<IShowRepository['findSeatMap']>(),
   create: vi.fn<IShowRepository['create']>(),
   update: vi.fn<IShowRepository['update']>(),
   delete: vi.fn<IShowRepository['delete']>(),
@@ -115,6 +116,35 @@ describe('shows routes', () => {
 
       expect(res.status).toBe(404);
       expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
+    });
+  });
+
+  describe('GET /api/shows/:id/seats', () => {
+    it('returns 200 with the seat map', async () => {
+      repository.findSeatMap.mockResolvedValue([...showSeatViews]);
+
+      const res = await request(app).get(`${showUrl}/seats`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ data: seatMap });
+      expect(repository.findSeatMap).toHaveBeenCalledWith(show.id);
+    });
+
+    it('returns 404 when the show does not exist', async () => {
+      repository.findSeatMap.mockResolvedValue(null);
+
+      const res = await request(app).get(`${showUrl}/seats`);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
+    });
+
+    it('returns 400 when the id is not a UUID', async () => {
+      const res = await request(app).get('/api/shows/not-a-uuid/seats');
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(repository.findSeatMap).not.toHaveBeenCalled();
     });
   });
 

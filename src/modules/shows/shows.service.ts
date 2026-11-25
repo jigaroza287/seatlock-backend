@@ -1,9 +1,11 @@
 import { AppError } from '../../shared/app-error.js';
+import { toSeatMap } from './shows.mapper.js';
 import { showRepository } from './shows.repository.js';
 import type {
   CreateShowInput,
   IShowRepository,
   ListShowsQuery,
+  SeatMap,
   Show,
   ShowListOutput,
   UpdateShowInput,
@@ -27,6 +29,15 @@ export class ShowService {
     }
 
     return show;
+  }
+
+  async getSeatMap(showId: string): Promise<SeatMap> {
+    const showSeats = await this.repository.findSeatMap(showId);
+    if (showSeats === null) {
+      throw notFound(showId);
+    }
+
+    return toSeatMap(showId, showSeats);
   }
 
   // No event or screen check here: the repository maps their FK errors to 400.

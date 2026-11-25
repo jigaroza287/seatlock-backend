@@ -51,6 +51,7 @@ src/
     <name>.service.ts      business rules
     <name>.repository.ts   Prisma access
     <name>.schema.ts       Zod schemas
+    <name>.mapper.ts       pure functions that reshape domain data for responses (optional)
     <name>.type.ts         types and interfaces
   shared/              AppError, Prisma error mapping, shared schemas and types
   generated/prisma/    generated client: gitignored, never edit
