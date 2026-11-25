@@ -1,6 +1,12 @@
 # seatlock-backend
 
-Backend for Seatlock, a ticket booking platform. Core problem: **no double booking under heavy demand**. Current scope is the event catalog API.
+![CI](https://github.com/jigaroza287/seatlock-backend/actions/workflows/ci.yaml/badge.svg)
+
+Backend for Seatlock, a ticket booking platform.
+
+Core problem: **No double booking under heavy demand**.
+
+Current scope: The catalog API (venues, screens, seats, events, shows), with the booking core in progress.
 
 **Stack:** Node 24, TypeScript, Express 5, Zod 4, Prisma 7 (`@prisma/adapter-pg`), Postgres 18 in Docker, Vitest, Supertest.
 
