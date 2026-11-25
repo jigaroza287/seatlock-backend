@@ -1,4 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
+import { env } from '../config/env.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 const connectionString = process.env['DATABASE_URL'];
@@ -14,4 +15,4 @@ const adapter = new PrismaPg({
   connectionTimeoutMillis: 5_000,
 });
 
-export const prisma = new PrismaClient({ adapter });
+export const prisma = new PrismaClient({ adapter, log: env.LOG_QUERIES ? ['query'] : [] });
