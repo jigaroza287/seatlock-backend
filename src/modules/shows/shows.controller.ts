@@ -27,6 +27,13 @@ export async function getShow(req: Request<IdParam>, res: Response) {
   return res.status(200).json({ data: existingShow });
 }
 
+export async function getShowSeats(req: Request<IdParam>, res: Response) {
+  const { id } = idParamSchema.parse(req.params);
+
+  const seatMap = await showService.getSeatMap(id);
+  return res.status(200).json({ data: seatMap });
+}
+
 export async function addShow(req: Request, res: Response) {
   const input = createShowSchema.parse(req.body);
 

@@ -226,13 +226,14 @@ A show is one event playing on one screen at one time.
 
 ### Show endpoints
 
-| Method | Path             | Body                                               | Success                                | Error                                                                                                                      |
-| ------ | ---------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/shows`     | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen or screen has no seats        |
-| GET    | `/api/shows`     | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                                   |
-| GET    | `/api/shows/:id` | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                              |
-| PATCH  | `/api/shows/:id` | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
-| DELETE | `/api/shows/:id` | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                              |
+| Method | Path                   | Body                                               | Success                                | Error                                                                                                                      |
+| ------ | ---------------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/shows`           | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen or screen has no seats        |
+| GET    | `/api/shows`           | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                                   |
+| GET    | `/api/shows/:id`       | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                              |
+| GET    | `/api/shows/:id/seats` | None                                               | 200 + [seat map](#show-seat-map)       | 400 invalid id, 404 not found                                                                                              |
+| PATCH  | `/api/shows/:id`       | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
+| DELETE | `/api/shows/:id`       | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                              |
 
 ### Show object
 
@@ -267,3 +268,34 @@ To move a show to another event or screen, delete it and create a new one.
 `from` and `to` form a half-open range. For "shows on a day", the client sends local midnight to the next local midnight with its offset, e.g. `from=2026-11-20T00:00:00%2B05:30&to=2026-11-21T00:00:00%2B05:30` (`+` encoded as `%2B`).
 
 Sorted by `startsAt` ascending, then `id` ascending so shows at the same time page in a stable order.
+
+### Show seat map
+
+`GET /api/shows/:id/seats` returns every seat of the show, grouped by row. Not paginated: a screen has at most 2,600 seats (26 rows of 100).
+
+```ts
+type SeatStatus = 'available' | 'unavailable';
+
+{
+  data: {
+    showId: string;
+    available: number; // count of seats with status 'available'
+    rows: {
+      row: string; // rowLabel, 'A' to 'Z'
+      seats: {
+        id: string; // seat id
+        seatNumber: number;
+        category: SeatCategory;
+        status: SeatStatus;
+      }
+      [];
+    }
+    [];
+  }
+}
+```
+
+- Rows are sorted by `row` ascending, seats by `seatNumber` ascending.
+- `available`: the seat can be picked. That's a free seat, or a reserved seat whose hold has expired (`held_until < now()`, by the database clock).
+- `unavailable`: the seat is booked, or reserved with a hold that hasn't expired. Clients can't tell the two apart, so the map doesn't reveal holds in progress.
+- The status is a snapshot. A seat shown as `available` can be taken before the client books it.

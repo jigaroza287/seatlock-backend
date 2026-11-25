@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/db/prisma.js';
 import { eventInput } from '../../src/modules/events/__tests__/events.fixtures.js';
-import type { CreateShowInput, Show } from '../../src/modules/shows/shows.type.js';
+import type { CreateShowInput, SeatMap, Show } from '../../src/modules/shows/shows.type.js';
 
 // Real app, real database. Covers what the mocked route tests can't: constraints, queries, persistence.
 
@@ -372,6 +372,128 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ data: { ...created, priceMinor: 0 } });
+    });
+  });
+
+  describe('GET /api/shows/:id/seats', () => {
+    let showId: string;
+    let bookingId: string;
+
+    beforeEach(async () => {
+      showId = (await createShow()).id;
+      const booking = await prisma.booking.create({
+        data: { showId, customerRef: 'customer-1', totalMinor: 50_000 },
+      });
+      bookingId = booking.id;
+    });
+
+    async function seatIdOf(rowLabel: string, seatNumber: number): Promise<string> {
+      const seat = await prisma.seat.findUniqueOrThrow({
+        where: { screenId_rowLabel_seatNumber: { screenId, rowLabel, seatNumber } },
+      });
+      return seat.id;
+    }
+
+    // No booking API yet, so seat states are written straight to show_seats, from the database
+    // clock like the real booking code will. A negative holdMinutes gives an expired hold.
+    async function reserveSeat(seatNumber: number, holdMinutes: number): Promise<void> {
+      const seatId = await seatIdOf('A', seatNumber);
+      await prisma.$executeRaw`
+        UPDATE show_seats
+        SET status = 'reserved',
+            booking_id = ${bookingId}::uuid,
+            held_until = now() + make_interval(mins => ${holdMinutes}::int)
+        WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid
+      `;
+    }
+
+    async function bookSeat(seatNumber: number): Promise<void> {
+      const seatId = await seatIdOf('A', seatNumber);
+      await prisma.$executeRaw`
+        UPDATE show_seats
+        SET status = 'booked', booking_id = ${bookingId}::uuid, held_until = NULL
+        WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid
+      `;
+    }
+
+    async function getSeatMap(): Promise<SeatMap> {
+      const res = await request(app).get(`/api/shows/${showId}/seats`);
+      expect(res.status).toBe(200);
+      return (res.body as { data: SeatMap }).data;
+    }
+
+    function statusesOf(seatMap: SeatMap): string[] {
+      return seatMap.rows.flatMap((row) => row.seats.map((seat) => seat.status));
+    }
+
+    it('returns every seat of a new show as available', async () => {
+      const res = await request(app).get(`/api/shows/${showId}/seats`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        data: {
+          showId,
+          available: 3,
+          rows: [
+            {
+              row: 'A',
+              seats: [1, 2, 3].map((seatNumber) => ({
+                id: expect.stringMatching(uuidV7) as string,
+                seatNumber,
+                category: 'standard',
+                status: 'available',
+              })),
+            },
+          ],
+        },
+      });
+    });
+
+    it('shows booked seats and seats on an active hold as unavailable', async () => {
+      await bookSeat(1);
+      await reserveSeat(2, 10);
+
+      const seatMap = await getSeatMap();
+
+      expect(statusesOf(seatMap)).toEqual(['unavailable', 'unavailable', 'available']);
+      expect(seatMap.available).toBe(1);
+    });
+
+    it('shows a seat whose hold has expired as available', async () => {
+      await reserveSeat(1, -1);
+
+      const seatMap = await getSeatMap();
+
+      expect(statusesOf(seatMap)).toEqual(['available', 'available', 'available']);
+      expect(seatMap.available).toBe(3);
+    });
+
+    // B10 is created before B2 and gets the smaller uuidv7, so only a sort by
+    // seat_number as an integer puts B2 first.
+    it('orders rows by label and seats by number', async () => {
+      await prisma.seat.createMany({
+        data: [10, 2].map((seatNumber) => ({
+          screenId,
+          rowLabel: 'B',
+          seatNumber,
+          category: 'premium',
+        })),
+      });
+      const otherShow = await createShow({ startsAt: '2026-12-02T14:30:00.000Z' });
+
+      const res = await request(app).get(`/api/shows/${otherShow.id}/seats`);
+
+      expect(res.status).toBe(200);
+      const { rows } = (res.body as { data: SeatMap }).data;
+      expect(rows.map((row) => row.row)).toEqual(['A', 'B']);
+      expect(rows[1]?.seats.map((seat) => seat.seatNumber)).toEqual([2, 10]);
+    });
+
+    it('returns 404 when the show does not exist', async () => {
+      const res = await request(app).get(`/api/shows/${missingId}/seats`);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
     });
   });
 
