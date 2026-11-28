@@ -1,31 +1,46 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../shared/app-error.js';
+import { event } from '../../events/__tests__/events.fixtures.js';
+import type { IEventRepository } from '../../events/events.type.js';
 import { ShowService } from '../shows.service.js';
-import type { IShowRepository, ListShowsQuery } from '../shows.type.js';
-import { seatMap, show, showInput, showSeatViews } from './shows.fixtures.js';
+import type { IShowRepository, ListShowsByEventQuery, ListShowsQuery } from '../shows.type.js';
+import { seatMap, show, showInput, showListingRow, showSeatViews } from './shows.fixtures.js';
 
 // shows.service.ts creates the real singleton on import, which loads Prisma and needs DATABASE_URL.
 vi.mock('../shows.repository.js', () => ({ showRepository: {} }));
+vi.mock('../../events/events.repository.js', () => ({ eventRepository: {} }));
 
 const notFound = { statusCode: 404, code: 'SHOW_NOT_FOUND' };
+const eventNotFound = { statusCode: 404, code: 'EVENT_NOT_FOUND' };
 
 describe('ShowService', () => {
   const findMany = vi.fn<IShowRepository['findMany']>();
   const findById = vi.fn<IShowRepository['findById']>();
   const findSeatMap = vi.fn<IShowRepository['findSeatMap']>();
+  const findShowsByEvent = vi.fn<IShowRepository['findShowsByEvent']>();
   const create = vi.fn<IShowRepository['create']>();
   const update = vi.fn<IShowRepository['update']>();
   const remove = vi.fn<IShowRepository['delete']>();
+  const findEventById = vi.fn<IEventRepository['findById']>();
 
   const repository: IShowRepository = {
     findMany,
     findById,
     findSeatMap,
+    findShowsByEvent,
     create,
     update,
     delete: remove,
   };
-  const service = new ShowService(repository);
+  // Only findById is used by the show service.
+  const eventRepository: IEventRepository = {
+    findMany: vi.fn<IEventRepository['findMany']>(),
+    findById: findEventById,
+    create: vi.fn<IEventRepository['create']>(),
+    update: vi.fn<IEventRepository['update']>(),
+    delete: vi.fn<IEventRepository['delete']>(),
+  };
+  const service = new ShowService(repository, eventRepository);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -68,6 +83,29 @@ describe('ShowService', () => {
       findSeatMap.mockResolvedValue(null);
 
       await expect(service.getSeatMap(show.id)).rejects.toMatchObject(notFound);
+    });
+  });
+
+  describe('getShowsByEvent', () => {
+    const query: ListShowsByEventQuery = { eventId: event.id, limit: 20, offset: 0 };
+
+    it('returns the event shows when the event exists', async () => {
+      findEventById.mockResolvedValue(event);
+      findShowsByEvent.mockResolvedValue({ items: [showListingRow], total: 1 });
+
+      await expect(service.getShowsByEvent(query)).resolves.toEqual({
+        items: [showListingRow],
+        total: 1,
+      });
+      expect(findEventById).toHaveBeenCalledWith(event.id);
+      expect(findShowsByEvent).toHaveBeenCalledWith(query);
+    });
+
+    it('throws EVENT_NOT_FOUND without listing when the event does not exist', async () => {
+      findEventById.mockResolvedValue(null);
+
+      await expect(service.getShowsByEvent(query)).rejects.toMatchObject(eventNotFound);
+      expect(findShowsByEvent).not.toHaveBeenCalled();
     });
   });
 

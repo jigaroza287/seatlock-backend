@@ -5,16 +5,18 @@ import {
   getShow,
   getShows,
   getShowSeats,
+  getEventShows,
   updateShow,
 } from './shows.controller.js';
 
 const router = Router();
 
-router.get('/', getShows);
-router.get('/:id', getShow);
-router.get('/:id/seats', getShowSeats);
-router.post('/', addShow);
-router.patch('/:id', updateShow);
-router.delete('/:id', deleteShow);
+router.get('/shows', getShows);
+router.get('/shows/:id', getShow);
+router.get('/shows/:id/seats', getShowSeats);
+router.get('/events/:eventId/shows', getEventShows);
+router.post('/shows', addShow);
+router.patch('/shows/:id', updateShow);
+router.delete('/shows/:id', deleteShow);
 
 export { router };

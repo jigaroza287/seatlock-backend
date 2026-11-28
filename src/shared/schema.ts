@@ -16,3 +16,7 @@ export const venueIdParamSchema = z.object({
 export const screenIdParamSchema = z.object({
   screenId: z.uuid(),
 });
+
+export const eventIdParamSchema = z.object({
+  eventId: z.uuid(),
+});

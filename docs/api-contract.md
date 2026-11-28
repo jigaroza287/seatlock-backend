@@ -226,14 +226,15 @@ A show is one event playing on one screen at one time.
 
 ### Show endpoints
 
-| Method | Path                   | Body                                               | Success                                | Error                                                                                                                      |
-| ------ | ---------------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/shows`           | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen or screen has no seats        |
-| GET    | `/api/shows`           | None                                               | 200 + paginated list                   | 400 invalid query params                                                                                                   |
-| GET    | `/api/shows/:id`       | None                                               | 200 + show                             | 400 invalid id, 404 not found                                                                                              |
-| GET    | `/api/shows/:id/seats` | None                                               | 200 + [seat map](#show-seat-map)       | 400 invalid id, 404 not found                                                                                              |
-| PATCH  | `/api/shows/:id`       | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                     | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
-| DELETE | `/api/shows/:id`       | None                                               | 204 No Content                         | 400 invalid id, 404 not found                                                                                              |
+| Method | Path                         | Body                                               | Success                                                   | Error                                                                                                                      |
+| ------ | ---------------------------- | -------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/shows`                 | `{ eventId, screenId, startsAt, priceMinor }`      | 201 + created show + `Location` header                    | 400 invalid body or unknown `eventId` / `screenId`, 409 overlaps another show on this screen or screen has no seats        |
+| GET    | `/api/shows`                 | None                                               | 200 + paginated list                                      | 400 invalid query params                                                                                                   |
+| GET    | `/api/shows/:id`             | None                                               | 200 + show                                                | 400 invalid id, 404 not found                                                                                              |
+| GET    | `/api/shows/:id/seats`       | None                                               | 200 + [seat map](#show-seat-map)                          | 400 invalid id, 404 not found                                                                                              |
+| GET    | `/api/events/:eventId/shows` | None                                               | 200 + paginated [event show listing](#event-show-listing) | 400 invalid id or query params, 404 event not found                                                                        |
+| PATCH  | `/api/shows/:id`             | Any non-empty subset of `{ startsAt, priceMinor }` | 200 + updated show                                        | 400 invalid body, `id`, `eventId`, `screenId` or `endsAt` in body, 404 not found, 409 overlaps another show on this screen |
+| DELETE | `/api/shows/:id`             | None                                               | 204 No Content                                            | 400 invalid id, 404 not found                                                                                              |
 
 ### Show object
 
@@ -299,3 +300,31 @@ type SeatStatus = 'available' | 'unavailable';
 - `available`: the seat can be picked. That's a free seat, or a reserved seat whose hold has expired (`held_until < now()`, by the database clock).
 - `unavailable`: the seat is booked, or reserved with a hold that hasn't expired. Clients can't tell the two apart, so the map doesn't reveal holds in progress.
 - The status is a snapshot. A seat shown as `available` can be taken before the client books it.
+
+### Event show listing
+
+`GET /api/events/:eventId/shows` lists the shows of one event with where they play and how many seats are left. Paginated with `limit` and `offset` only; the [show list filters](#show-list-filters) don't apply here.
+
+```ts
+{
+  data: {
+    id: string; // show id
+    startsAt: string; // ISO 8601 in UTC
+    endsAt: string; // ISO 8601 in UTC
+    priceMinor: number;
+    venueName: string;
+    screenName: string;
+    available: number; // seats a client can pick right now
+  }
+  [];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number; // every show of the event
+  }
+}
+```
+
+- An unknown event returns 404 `EVENT_NOT_FOUND`. An event with no shows returns an empty list.
+- Sorted by `startsAt` ascending, then `id` ascending, like `GET /api/shows`.
+- `available` uses the same rule as the [seat map](#show-seat-map): free seats plus reserved seats whose hold has expired. It's a snapshot.

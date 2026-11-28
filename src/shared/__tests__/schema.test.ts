@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  eventIdParamSchema,
   idParamSchema,
   listQuerySchema,
   screenIdParamSchema,
@@ -84,5 +85,21 @@ describe('screenIdParamSchema', () => {
 
   it('rejects a missing screenId', () => {
     expect(screenIdParamSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('eventIdParamSchema', () => {
+  it('accepts a valid UUID', () => {
+    expect(
+      eventIdParamSchema.safeParse({ eventId: '550e8400-e29b-41d4-a716-446655440000' }).success
+    ).toBe(true);
+  });
+
+  it.each(['not-a-uuid', ''])('rejects an invalid eventId: "%s"', (eventId) => {
+    expect(eventIdParamSchema.safeParse({ eventId }).success).toBe(false);
+  });
+
+  it('rejects a missing eventId', () => {
+    expect(eventIdParamSchema.safeParse({}).success).toBe(false);
   });
 });

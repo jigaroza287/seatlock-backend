@@ -1,12 +1,15 @@
 import { prisma } from '../../db/prisma.js';
-import { type PrismaClient, type Show as ShowRow } from '../../generated/prisma/client.js';
+import { Prisma, type PrismaClient, type Show as ShowRow } from '../../generated/prisma/client.js';
 import { AppError } from '../../shared/app-error.js';
 import { isRecordNotFound, toAppError } from '../../shared/prisma-error.js';
 import type {
   CreateShowInput,
   IShowRepository,
+  ListShowsByEventQuery,
   ListShowsQuery,
   Show,
+  ShowListingOutput,
+  ShowListingRow,
   ShowListOutput,
   ShowSeatView,
   UpdateShowInput,
@@ -33,6 +36,13 @@ function toEndsAt(startsAt: Date, durationMins: number): Date {
 
 type DurationRow = { durationMins: number };
 
+// Whether a show seat can be picked: free, or reserved with an expired hold. Used by the seat map
+// and the event show listing so their counts can never disagree. Expects show_seats aliased as ss.
+// Wrapped in parentheses so `... AND ${isSeatAvailable}` can't bind to the first OR branch only.
+const isSeatAvailable = Prisma.sql`(
+  ss.status = 'available' OR (ss.status = 'reserved' AND ss.held_until < now())
+)`;
+
 type SeatMapDbRow = {
   id: string;
   rowLabel: string;
@@ -43,6 +53,16 @@ type SeatMapDbRow = {
 
 function toShowSeatView({ isAvailable, ...seat }: SeatMapDbRow): ShowSeatView {
   return { ...seat, status: isAvailable ? 'available' : 'unavailable' };
+}
+
+// pg returns timestamptz columns as Date, so the raw row differs from ShowListingRow.
+type ShowListingDbRow = Omit<ShowListingRow, 'startsAt' | 'endsAt'> & {
+  startsAt: Date;
+  endsAt: Date;
+};
+
+function toShowListingRow({ startsAt, endsAt, ...rest }: ShowListingDbRow): ShowListingRow {
+  return { ...rest, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() };
 }
 
 class ShowRepository implements IShowRepository {
@@ -90,10 +110,7 @@ class ShowRepository implements IShowRepository {
         st.row_label   AS "rowLabel",
         st.seat_number AS "seatNumber",
         st.category,
-        (
-          ss.status = 'available'
-          OR (ss.status = 'reserved' AND ss.held_until < now())
-        )              AS "isAvailable"
+        ${isSeatAvailable} AS "isAvailable"
       FROM show_seats ss
       JOIN seats st ON st.id = ss.seat_id
       WHERE ss.show_id = ${showId}::uuid
@@ -104,6 +121,42 @@ class ShowRepository implements IShowRepository {
       return null;
     }
     return rows.map(toShowSeatView);
+  }
+
+  async findShowsByEvent(listShowsQuery: ListShowsByEventQuery): Promise<ShowListingOutput> {
+    const { eventId, limit, offset } = listShowsQuery;
+
+    // Repeatable Read so both queries share one snapshot. Under the default Read Committed each
+    // statement takes its own, so a show created in between could make total disagree with the page.
+    const [rows, total] = await this.db.$transaction(
+      [
+        this.db.$queryRaw<ShowListingDbRow[]>`
+      SELECT
+        s.id,
+        s.starts_at   AS "startsAt",
+        s.ends_at     AS "endsAt",
+        s.price_minor AS "priceMinor",
+        sc.name       AS "screenName",
+        v.name        AS "venueName",
+        seat_counts.available
+      FROM shows s
+      JOIN screens sc ON sc.id = s.screen_id
+      JOIN venues v   ON v.id = sc.venue_id
+      CROSS JOIN LATERAL (
+        SELECT (count(*) FILTER (WHERE ${isSeatAvailable}))::int AS available
+        FROM show_seats ss
+        WHERE ss.show_id = s.id
+      ) seat_counts
+      WHERE s.event_id = ${eventId}::uuid
+      ORDER BY s.starts_at, s.id
+      LIMIT ${limit} OFFSET ${offset}
+    `,
+        this.db.show.count({ where: { eventId } }),
+      ],
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
+    );
+
+    return { items: rows.map(toShowListingRow), total };
   }
 
   // endsAt = startsAt + event duration. The event row is read FOR SHARE so an event PATCH
