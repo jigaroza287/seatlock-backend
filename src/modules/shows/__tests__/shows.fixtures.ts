@@ -1,4 +1,10 @@
-import type { CreateShowInput, SeatMap, Show, ShowSeatView } from '../shows.type.js';
+import type {
+  CreateShowInput,
+  SeatMap,
+  Show,
+  ShowListingRow,
+  ShowSeatView,
+} from '../shows.type.js';
 
 // Shared valid baseline for shows tests. Frozen so a test can't change it for the others.
 // Keep case-specific changes inline in each test, e.g. { ...showInput, priceMinor: -1 }.
@@ -75,4 +81,15 @@ export const seatMap: Readonly<SeatMap> = Object.freeze<SeatMap>({
       ],
     },
   ],
+});
+
+// show as one row of GET /api/events/:eventId/shows. available matches seatMap.
+export const showListingRow: Readonly<ShowListingRow> = Object.freeze({
+  id: show.id,
+  startsAt: show.startsAt,
+  endsAt: show.endsAt,
+  priceMinor: show.priceMinor,
+  venueName: 'Grand Plaza',
+  screenName: 'Screen 1',
+  available: 2,
 });

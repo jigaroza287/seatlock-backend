@@ -2,24 +2,39 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../../app.js';
 import { AppError } from '../../../shared/app-error.js';
+import { event } from '../../events/__tests__/events.fixtures.js';
+import type { IEventRepository } from '../../events/events.type.js';
 import type { IShowRepository } from '../shows.type.js';
-import { seatMap, show, showInput, showSeatViews } from './shows.fixtures.js';
+import { seatMap, show, showInput, showListingRow, showSeatViews } from './shows.fixtures.js';
 
-// Replace the Prisma repository so routes, controller, service and middleware run without a database.
-// vi.hoisted lets the vi.mock factory, which runs before imports, use these mocks.
-const repository = vi.hoisted(() => ({
-  findMany: vi.fn<IShowRepository['findMany']>(),
-  findById: vi.fn<IShowRepository['findById']>(),
-  findSeatMap: vi.fn<IShowRepository['findSeatMap']>(),
-  create: vi.fn<IShowRepository['create']>(),
-  update: vi.fn<IShowRepository['update']>(),
-  delete: vi.fn<IShowRepository['delete']>(),
+// Replace the Prisma repositories so routes, controller, service and middleware run without a database.
+// vi.hoisted lets the vi.mock factories, which run before imports, use these mocks.
+const { repository, eventRepository } = vi.hoisted(() => ({
+  repository: {
+    findMany: vi.fn<IShowRepository['findMany']>(),
+    findById: vi.fn<IShowRepository['findById']>(),
+    findSeatMap: vi.fn<IShowRepository['findSeatMap']>(),
+    findShowsByEvent: vi.fn<IShowRepository['findShowsByEvent']>(),
+    create: vi.fn<IShowRepository['create']>(),
+    update: vi.fn<IShowRepository['update']>(),
+    delete: vi.fn<IShowRepository['delete']>(),
+  },
+  eventRepository: {
+    findMany: vi.fn<IEventRepository['findMany']>(),
+    findById: vi.fn<IEventRepository['findById']>(),
+    create: vi.fn<IEventRepository['create']>(),
+    update: vi.fn<IEventRepository['update']>(),
+    delete: vi.fn<IEventRepository['delete']>(),
+  },
 }));
 vi.mock('../shows.repository.js', () => ({ showRepository: repository }));
+// The show service looks up the event before listing its shows.
+vi.mock('../../events/events.repository.js', () => ({ eventRepository }));
 // app.ts also loads the other modules' repositories; stop them creating a real Prisma client.
 vi.mock('../../../db/prisma.js', () => ({ prisma: {} }));
 
 const showUrl = `/api/shows/${show.id}`;
+const eventShowsUrl = `/api/events/${event.id}/shows`;
 
 // What toAppError returns for shows_no_overlap.
 const overlap = AppError.conflict('Show', 'Shows on this screen would overlap');
@@ -145,6 +160,87 @@ describe('shows routes', () => {
       expect(res.status).toBe(400);
       expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
       expect(repository.findSeatMap).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/events/:eventId/shows', () => {
+    it('returns 200 with data and default pagination', async () => {
+      eventRepository.findById.mockResolvedValue(event);
+      repository.findShowsByEvent.mockResolvedValue({ items: [showListingRow], total: 1 });
+
+      const res = await request(app).get(eventShowsUrl);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        data: [showListingRow],
+        pagination: { limit: 20, offset: 0, total: 1 },
+      });
+      expect(repository.findShowsByEvent).toHaveBeenCalledWith({
+        eventId: event.id,
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    it('passes limit and offset from the query string', async () => {
+      eventRepository.findById.mockResolvedValue(event);
+      repository.findShowsByEvent.mockResolvedValue({ items: [], total: 0 });
+
+      const res = await request(app).get(`${eventShowsUrl}?limit=5&offset=10`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ data: [], pagination: { limit: 5, offset: 10, total: 0 } });
+      expect(repository.findShowsByEvent).toHaveBeenCalledWith({
+        eventId: event.id,
+        limit: 5,
+        offset: 10,
+      });
+    });
+
+    it('ignores show list filters in the query string', async () => {
+      eventRepository.findById.mockResolvedValue(event);
+      repository.findShowsByEvent.mockResolvedValue({ items: [], total: 0 });
+
+      const res = await request(app).get(`${eventShowsUrl}?eventId=${show.eventId}`);
+
+      expect(res.status).toBe(200);
+      expect(repository.findShowsByEvent).toHaveBeenCalledWith({
+        eventId: event.id,
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    it.each([
+      { reason: 'limit is 0', query: 'limit=0' },
+      { reason: 'limit is above 100', query: 'limit=101' },
+      { reason: 'offset is negative', query: 'offset=-1' },
+      { reason: 'limit is not a number', query: 'limit=abc' },
+    ])('returns 400 when $reason', async ({ query }) => {
+      const res = await request(app).get(`${eventShowsUrl}?${query}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(repository.findShowsByEvent).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when the eventId is not a UUID', async () => {
+      const res = await request(app).get('/api/events/not-a-uuid/shows');
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(eventRepository.findById).not.toHaveBeenCalled();
+      expect(repository.findShowsByEvent).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the event does not exist', async () => {
+      eventRepository.findById.mockResolvedValue(null);
+
+      const res = await request(app).get(eventShowsUrl);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: { code: 'EVENT_NOT_FOUND' } });
+      expect(repository.findShowsByEvent).not.toHaveBeenCalled();
     });
   });
 

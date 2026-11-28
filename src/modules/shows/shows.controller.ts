@@ -1,9 +1,9 @@
 import { type Request, type Response } from 'express';
-import { idParamSchema } from '../../shared/schema.js';
-import type { IdParam } from '../../shared/types.js';
+import { eventIdParamSchema, idParamSchema, listQuerySchema } from '../../shared/schema.js';
+import type { EventIdParam, IdParam } from '../../shared/types.js';
 import { createShowSchema, listShowQuerySchema, updateShowSchema } from './shows.schema.js';
 import { showService } from './shows.service.js';
-import type { ShowListOutput } from './shows.type.js';
+import type { ShowListingOutput, ShowListOutput } from './shows.type.js';
 
 export async function getShows(req: Request, res: Response) {
   const input = listShowQuerySchema.parse(req.query);
@@ -32,6 +32,26 @@ export async function getShowSeats(req: Request<IdParam>, res: Response) {
 
   const seatMap = await showService.getSeatMap(id);
   return res.status(200).json({ data: seatMap });
+}
+
+// eventId comes from the path. The query only takes limit and offset.
+export async function getEventShows(req: Request<EventIdParam>, res: Response) {
+  const { eventId } = eventIdParamSchema.parse(req.params);
+  const { limit, offset } = listQuerySchema.parse(req.query);
+  const showListOutput: ShowListingOutput = await showService.getShowsByEvent({
+    eventId,
+    limit,
+    offset,
+  });
+
+  return res.status(200).json({
+    data: showListOutput.items,
+    pagination: {
+      limit,
+      offset,
+      total: showListOutput.total,
+    },
+  });
 }
 
 export async function addShow(req: Request, res: Response) {

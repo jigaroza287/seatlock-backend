@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/db/prisma.js';
 import { eventInput } from '../../src/modules/events/__tests__/events.fixtures.js';
-import type { CreateShowInput, SeatMap, Show } from '../../src/modules/shows/shows.type.js';
+import type {
+  CreateShowInput,
+  SeatMap,
+  Show,
+  ShowListingRow,
+} from '../../src/modules/shows/shows.type.js';
 
 // Real app, real database. Covers what the mocked route tests can't: constraints, queries, persistence.
 
@@ -494,6 +499,117 @@ describe('shows integration', () => {
 
       expect(res.status).toBe(404);
       expect(res.body).toMatchObject({ error: { code: 'SHOW_NOT_FOUND' } });
+    });
+  });
+
+  describe('GET /api/events/:eventId/shows', () => {
+    let otherScreenId: string;
+    let early: Show;
+    let late: Show;
+
+    // early on Screen 2, late on Screen 1, plus a show of another event that must not appear.
+    beforeEach(async () => {
+      otherScreenId = await createScreenId('Screen 2');
+      late = await createShow({ startsAt: '2026-12-02T14:30:00.000Z' });
+      early = await createShow({ screenId: otherScreenId, startsAt: '2026-12-01T14:30:00.000Z' });
+      const otherEventId = await createEventId('Rock concert');
+      await createShow({ eventId: otherEventId, startsAt: '2026-12-03T14:30:00.000Z' });
+    });
+
+    function listingOf(body: unknown): ShowListingRow[] {
+      return (body as { data: ShowListingRow[] }).data;
+    }
+
+    // Same seat-state setup as the seat map tests: A1 booked, A2 on an active hold, A3 on an
+    // expired hold. Written straight to show_seats from the database clock.
+    async function setSeatStates(showId: string): Promise<void> {
+      const booking = await prisma.booking.create({
+        data: { showId, customerRef: 'customer-1', totalMinor: 50_000 },
+      });
+      await prisma.$executeRaw`
+        UPDATE show_seats ss
+        SET status = CASE st.seat_number WHEN 1 THEN 'booked' ELSE 'reserved' END,
+            booking_id = ${booking.id}::uuid,
+            held_until = CASE st.seat_number
+              WHEN 1 THEN NULL
+              WHEN 2 THEN now() + interval '10 minutes'
+              ELSE now() - interval '1 minute'
+            END
+        FROM seats st
+        WHERE st.id = ss.seat_id AND ss.show_id = ${showId}::uuid
+      `;
+    }
+
+    it('returns the event shows with venue, screen and seat count, ordered by startsAt', async () => {
+      const res = await request(app).get(`/api/events/${eventId}/shows`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        data: [
+          {
+            id: early.id,
+            startsAt: early.startsAt,
+            endsAt: early.endsAt,
+            priceMinor: early.priceMinor,
+            venueName: 'Venue for Screen 2',
+            screenName: 'Screen 2',
+            available: 3,
+          },
+          {
+            id: late.id,
+            startsAt: late.startsAt,
+            endsAt: late.endsAt,
+            priceMinor: late.priceMinor,
+            venueName: 'Venue for Screen 1',
+            screenName: 'Screen 1',
+            available: 3,
+          },
+        ],
+        pagination: { limit: 20, offset: 0, total: 2 },
+      });
+    });
+
+    it('counts free seats and expired holds as available, not booked seats or active holds', async () => {
+      await setSeatStates(late.id);
+
+      const res = await request(app).get(`/api/events/${eventId}/shows`);
+
+      expect(res.status).toBe(200);
+      expect(listingOf(res.body).map((show) => show.available)).toEqual([3, 1]);
+    });
+
+    it('breaks startsAt ties by id', async () => {
+      const thirdScreenId = await createScreenId('Screen 3');
+      await createShow({ screenId: thirdScreenId, startsAt: early.startsAt });
+
+      const res = await request(app).get(`/api/events/${eventId}/shows?limit=2`);
+
+      const ids = listingOf(res.body).map((show) => show.id);
+      expect(ids).toEqual([...ids].sort());
+    });
+
+    it('pages with limit and offset while total counts every show of the event', async () => {
+      const res = await request(app).get(`/api/events/${eventId}/shows?limit=1&offset=1`);
+
+      expect(res.status).toBe(200);
+      expect(listingOf(res.body).map((show) => show.id)).toEqual([late.id]);
+      expect(res.body).toMatchObject({ pagination: { limit: 1, offset: 1, total: 2 } });
+    });
+
+    it('returns an empty list for an event with no shows', async () => {
+      const emptyEventId = await createEventId('Jazz night');
+
+      const res = await request(app).get(`/api/events/${emptyEventId}/shows`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ data: [], pagination: { limit: 20, offset: 0, total: 0 } });
+    });
+
+    it('returns 404 when the event does not exist', async () => {
+      const res = await request(app).get(`/api/events/${missingId}/shows`);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: { code: 'EVENT_NOT_FOUND' } });
     });
   });
 

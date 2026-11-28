@@ -15,7 +15,7 @@ app.use('/api/events', eventRouter);
 app.use('/api/venues', venueRouter);
 app.use('/api', screenRouter);
 app.use('/api', seatRouter);
-app.use('/api/shows', showRouter);
+app.use('/api', showRouter);
 
 app.use((req, _res) => {
   throw AppError.notFound(

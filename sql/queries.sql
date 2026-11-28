@@ -214,3 +214,15 @@ ORDER BY
   s.name;
 
 -- Result of Query 15: 3 rows
+SELECT
+  s.id AS "showId",
+  s.starts_at AS "startsAt",
+  s.ends_at AS "endsAt",
+  s.price_minor AS "priceMinor",
+  sc.name AS "screenName",
+  v.name AS "venueName"
+FROM
+  shows s
+  INNER JOIN show_seats ss ON ss.show_id = s.id
+  INNER JOIN screens sc ON s.screen_id = sc.id
+  INNER JOIN venues v ON sc.venue_id = v.id

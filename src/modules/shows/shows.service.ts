@@ -1,12 +1,16 @@
 import { AppError } from '../../shared/app-error.js';
+import { eventRepository } from '../events/events.repository.js';
+import type { IEventRepository } from '../events/events.type.js';
 import { toSeatMap } from './shows.mapper.js';
 import { showRepository } from './shows.repository.js';
 import type {
   CreateShowInput,
   IShowRepository,
+  ListShowsByEventQuery,
   ListShowsQuery,
   SeatMap,
   Show,
+  ShowListingOutput,
   ShowListOutput,
   UpdateShowInput,
 } from './shows.type.js';
@@ -15,8 +19,15 @@ function notFound(id: string): AppError {
   return AppError.notFound('Show', `Could not find any show with id: ${id}`);
 }
 
+function eventNotFound(eventId: string): AppError {
+  return AppError.notFound('Event', `Could not find any event with id: ${eventId}`);
+}
+
 export class ShowService {
-  constructor(private readonly repository: IShowRepository) {}
+  constructor(
+    private readonly repository: IShowRepository,
+    private readonly eventRepository: IEventRepository
+  ) {}
 
   list(listShowsQuery: ListShowsQuery): Promise<ShowListOutput> {
     return this.repository.findMany(listShowsQuery);
@@ -38,6 +49,16 @@ export class ShowService {
     }
 
     return toSeatMap(showId, showSeats);
+  }
+
+  // A list query has no insert to fail on, so the event is looked up first.
+  async getShowsByEvent(listShowsQuery: ListShowsByEventQuery): Promise<ShowListingOutput> {
+    const event = await this.eventRepository.findById(listShowsQuery.eventId);
+    if (event === null) {
+      throw eventNotFound(listShowsQuery.eventId);
+    }
+
+    return this.repository.findShowsByEvent(listShowsQuery);
   }
 
   // No event or screen check here: the repository maps their FK errors to 400.
@@ -62,4 +83,4 @@ export class ShowService {
   }
 }
 
-export const showService = new ShowService(showRepository);
+export const showService = new ShowService(showRepository, eventRepository);
